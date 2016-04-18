@@ -182,4 +182,27 @@ public class RTPUtil {
       Print.errorLn(e.getMessage());
     }
   }
+
+  public static byte[] buildDataFromHash(int totalBytes, HashMap<Integer, RTPPacket> packets) {
+    int[] seqNums = Arrays.sort(packets.keySet().toArray());
+    ByteBuffer buff = ByteBuffer.allocate(totalBytes);
+    byte[] toReturn = new byte[totalBytes];
+    for(RTPPacket p: packets) {
+      byte[] data = p.getData();
+      buff.put(data);
+    }
+    buff.flip();
+    buff.get(toReturn);
+    return toReturn;
+  }
+
+  private static void addToDataBuffer(byte[] data) {
+    if(dataBuffer == null) dataBuffer = new byte[0];
+    ByteBuffer buff = ByteBuffer.allocate(dataBuffer.length + data.length);
+    buff.put(dataBuffer);
+    buff.put(data);
+    buff.flip();
+    dataBuffer = new byte[buff.remaining()];
+    buff.get(dataBuffer);
+  }
 }

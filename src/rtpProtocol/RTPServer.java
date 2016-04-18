@@ -9,7 +9,7 @@ import util.*;
 public class RTPServer {
 
   private String sIP;
-  private int sPort, window, recvWindow;
+  private int sPort, window;
 
   private DatagramSocket socket;
   private PacketBuffer buffer;
@@ -30,7 +30,7 @@ public class RTPServer {
   }
 
   //============================================================================
-  // Start server Methods
+  // Start Server Methods
   //============================================================================
 
   public void start () {
@@ -38,15 +38,20 @@ public class RTPServer {
       Print.errorLn("Server is already running.");
       return;
     }
+
     running = true;
     socket = RTPUtil.openSocket(sPort, sIP);
     receivePackets();
+
     acceptConnections();
+    listenForGet();
+    listenForData();
+    listenForFin();
   }
 
   public void receivePackets () {
-    Print.statusLn("Receiving at " + sIP + ":" + sPort + "...\n");
     new Thread(new Runnable() {@Override public void run() {
+      Print.statusLn("Receiving at " + sIP + ":" + sPort + "...\n");
       for(;;) {
         RTPPacket in = RTPUtil.recvPacket(socket);
         buffer.put(in);
@@ -65,11 +70,9 @@ public class RTPServer {
         RTPPacket syn = newConnectionRequest();
 
         Print.recvLn("\tReceived new SYN packet");
-        PacketFactory factory = new PacketFactory(sPort, sIP, window, syn.getWindowSize());
-        factories.put(key, factory);
+        createConnection(syn);
 
         sendSYNACK(syn, factory);
-        Print.statusLn("Connection established with " + syn.hash());
       }
     }}).start();
   }
@@ -83,8 +86,14 @@ public class RTPServer {
         if (!connectionExists)
           return syn;
       }
-      RTPUtil.wait();
+      else RTPUtil.wait();
     }
+  }
+
+  private PacketFactory createConnection(RTPPacket syn) {
+    int recvWindow = syn.getWindowSize();
+    PacketFactory factory = new PacketFactory(sPort, sIP, window, recvWindow);
+    factories.put(syn.hash(), factory);
   }
 
   private void sendSYNACK (RTPPacket syn, PacketFactory factory) {
@@ -122,7 +131,7 @@ public class RTPServer {
         posts.put(key, postProcess);
 
         byte[] data = RTPUtil.getFileBytes(filename);
-        processOutgoingData(filename, key, data, postProcess);
+        processOutgoingData(filename, key, data);
       }
     }}).start();
   }
@@ -142,7 +151,7 @@ public class RTPServer {
 
   private void processOutgoingData(String filename, String key, byte[] data) {
     new Thread(new Runnable() {@Override public void run() {
-      posts.get(key).sendData(data);
+      posts.get(key).startPost(data);
 
       for(;;) {
         if(posts.get(key).isPostComplete()) {
@@ -150,7 +159,7 @@ public class RTPServer {
           return;
         }
         else if(buffer.hasACK())
-          posts.get(key).recvAck(buffer.getACK());
+          posts.get(key).handleAck(buffer.getACK());
         else
           RTPUtil.wait();
       }
@@ -159,7 +168,6 @@ public class RTPServer {
 
   private void endPOST(String filename, String key) {
     Print.statusLn("POST process completed for " + filename);
-    posts.get(key).setPostComplete();
   }
 
   //============================================================================
@@ -171,7 +179,7 @@ public class RTPServer {
       for(;;) {
         if(buffer.hasDATAFIN()) handleDataFin();
         else if(buffer.hasDATA()) handleData();
-        RTPUtil.wait();
+        else RTPUtil.wait();
       }
     }}).start();
   }
