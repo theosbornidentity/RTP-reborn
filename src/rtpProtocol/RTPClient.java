@@ -32,7 +32,6 @@ public class RTPClient {
 
   public void start () {
     socket = RTPUtil.openSocket(sPort, sIP);
-    factory = new PacketFactory(sPort, sIP, window)
     receivePackets();
   }
 
@@ -103,6 +102,7 @@ public class RTPClient {
     RTPPacket synack = sendSYN();
 
     this.recvWindow = synack.getWindowSize();
+    factory = new PacketFactory(sPort, sIP, window, recvWindow);
 
     Print.statusLn("Connected to server at " + this.dIP + ":" + this.dPort +
                    "\tWindow size " + this.recvWindow + "\n");
@@ -133,7 +133,7 @@ public class RTPClient {
   //============================================================================
 
   private RTPService createConnectionService () {
-    return RTPService (socket, factory, recvWindow);
+    return RTPService (socket, factory);
   }
 
   private void sendGET (String filename) {
@@ -213,8 +213,37 @@ public class RTPClient {
 
   private void endPOST (String filename) {
     Print.statusLn("POST process completed for " + filename);
+    sendDataFin();
     postProcess = null;
     postComplete = true;
+  }
+
+  private void sendDataFin (String filename) {
+    RTPPacket datafin = factory.createDataFinPacket(filename.getBytes());
+
+    for(;;) {
+      RTPUtil.sendPacket(socket, datafin);
+      Print.sendLn("\tSent DATAFIN Packet for " + filename);
+
+      RTPUtil.wait();
+
+      if(recvDataFinAck(filename))
+        return;
+
+      Print.infoLn("\tNo response to DATAFIN... resending\n");
+    }
+  }
+
+  private boolean recvDataFinAck(String filename) {
+    if(buffer.hasDATAFIN()) {
+      RTPPacket datafinack = buffer.getDATAFIN();
+      String ackedFile = new String(datafinack.getData());
+      if(ackedFile.equals(filename)) {
+        Print.statusLn("\tServer acked DATAFIN...\n");
+        return true;
+      }
+    }
+    return false;
   }
 
   //============================================================================
