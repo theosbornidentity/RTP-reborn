@@ -112,6 +112,14 @@ public class RTPUtil {
     }
   }
 
+  public static void wait() {
+    try {
+      Thread.sleep(100);
+    } catch(InterruptedException e) {
+      Print.errorLn(e.getMessage());
+    }
+  }
+
   public static byte[] getFileBytes(String filename) {
     try {
       Path path = Paths.get("src/fta/" + filename);
@@ -122,10 +130,22 @@ public class RTPUtil {
     }
   }
 
-  public static void checkIntegrityAndCreateFile(byte[] data) {
+  public static void createGETFile(String filename, byte[] data) {
     try {
-      checkTransfer("3251.jpg", data);
-      Path path = Paths.get("src/fta/out.jpg");
+      checkTransfer(filename, data);
+      Path path = Paths.get("src/fta/get_F.jpg");
+      Files.write(path, data);
+    }
+    catch (IOException e) {
+      Print.errorLn("Could not create file.");
+      e.printStackTrace();
+    }
+  }
+
+  public static void createPOSTFile(String filename, byte[] data) {
+    try {
+      checkTransfer(filename, data);
+      Path path = Paths.get("src/fta/post_G.jpg");
       Files.write(path, data);
     }
     catch (IOException e) {

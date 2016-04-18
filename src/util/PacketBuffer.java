@@ -7,9 +7,9 @@ public class PacketBuffer {
   ArrayList<RTPPacket> SYN;
   ArrayList<RTPPacket> SYNACK;
   ArrayList<RTPPacket> GET;
-  ArrayList<RTPPacket> GETPOST;
-  HashMap<Integer, RTPPacket> DATA;
-  HashMap<Integer, RTPPacket> ACK;
+  ArrayList<RTPPacket> POST;
+  ArrayList<RTPPacket> DATA;
+  ArrayList<RTPPacket> ACK;
   ArrayList<RTPPacket> DATAFIN;
   ArrayList<RTPPacket> FIN;
   ArrayList<RTPPacket> FINACK;
@@ -18,9 +18,9 @@ public class PacketBuffer {
     SYN = new ArrayList<RTPPacket>();
     SYNACK = new ArrayList<RTPPacket>();
     GET = new ArrayList<RTPPacket>();
-    GETPOST = new ArrayList<RTPPacket>();
-    DATA = new HashMap<Integer, RTPPacket>();
-    ACK = new ArrayList<Integer, RTPPacket>();
+    POST = new ArrayList<RTPPacket>();
+    DATA = new ArrayList<RTPPacket>();
+    ACK = new ArrayList<RTPPacket>();
     DATAFIN = new ArrayList<RTPPacket>();
     FIN = new ArrayList<RTPPacket>();
     FINACK = new ArrayList<RTPPacket>();
@@ -44,18 +44,16 @@ public class PacketBuffer {
       if(!GET.contains(in)) GET.add(in);
     }
 
-    else if(in.isType(State.GETPOST)) {
-      if(!GETPOST.contains(in)) GETPOST.add(in);
+    else if(in.isType(State.POST)) {
+      if(!POST.contains(in)) POST.add(in);
     }
 
     else if(in.isType(State.DATA)) {
-      int seqNum = in.getSeqNum();
-      if(!DATA.containsKey(seqNum)) DATA.put(seqNum, in);
+      if(!DATA.contains(in)) DATA.add(in);
     }
 
     else if(in.isType(State.ACK)) {
-      int ackNum = in.getAckNum();
-      if(!DATA.containsKey(ackNum)) ACK.put(ackNum, in);
+      if(!DATA.contains(in)) ACK.add(in);
     }
 
     else if(in.isType(State.DATAFIN)) {
@@ -91,16 +89,16 @@ public class PacketBuffer {
     return !GET.isEmpty();
   }
 
-  public RTPPacket hasGETPOST() {
-    return !GETPOST.isEmpty();
+  public RTPPacket hasPOST() {
+    return !POST.isEmpty();
   }
 
-  public RTPPacket hasDATA(int seqNum) {
-    return !DATA.containsKey(seqNum);
+  public RTPPacket hasDATA() {
+    return !DATA.isEmpty();
   }
 
-  public RTPPacket hasACK(int ackNum) {
-    return !ACK.isEmpty(ackNum);
+  public RTPPacket hasACK() {
+    return !ACK.isEmpty();
   }
 
   public RTPPacket hasDATAFIN() {
@@ -131,16 +129,16 @@ public class PacketBuffer {
     return GET.remove(0);
   }
 
-  public RTPPacket getGETPOST() {
-    return GETPOST.remove(0);
+  public RTPPacket getPOST() {
+    return POST.remove(0);
   }
 
-  public RTPPacket getDATA(int seqNum) {
-    return DATA.remove(seqNum);
+  public RTPPacket getDATA() {
+    return DATA.remove(0);
   }
 
-  public RTPPacket getACK(int ackNum) {
-    return ACK.remove(ackNum);
+  public RTPPacket getACK() {
+    return ACK.remove(0);
   }
 
   public RTPPacket getDATAFIN() {
@@ -163,7 +161,7 @@ public class PacketBuffer {
     SYN = new ArrayList<RTPPacket>();
     SYNACK = new ArrayList<RTPPacket>();
     GET = new ArrayList<RTPPacket>();
-    GETPOST = new ArrayList<RTPPacket>();
+    POST = new ArrayList<RTPPacket>();
     DATA = new HashMap<Integer, RTPPacket>();
     ACK = new ArrayList<Integer, RTPPacket>();
     DATAFIN = new ArrayList<RTPPacket>();
