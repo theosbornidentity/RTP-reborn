@@ -12,11 +12,14 @@ public class RTPServer {
   private int sPort, window;
 
   private DatagramSocket socket;
+
   private PacketBuffer buffer;
+  // private PacketBuffer dataBuffer;
+  // private PacketBuffer ackBuffer;
 
   private HashMap<String, PacketFactory> factories;
-  private HashMap<String, PacketService> posts;
-  private HashMap<String, PacketService> gets;
+  private HashMap<String, RTPService> posts;
+  private HashMap<String, RTPService> gets;
 
   private boolean running;
 
@@ -25,8 +28,8 @@ public class RTPServer {
     this.sIP = RTPUtil.getIPAddress();
     this.window = win;
     this.factories = new HashMap<String, PacketFactory>();
-    this.posts = new HashMap<String, PacketService>();
-    this.gets = new HashMap<String, PacketService>();
+    this.posts = new HashMap<String, RTPService>();
+    this.gets = new HashMap<String, RTPService>();
   }
 
   //============================================================================
@@ -41,11 +44,19 @@ public class RTPServer {
 
     running = true;
     socket = RTPUtil.openSocket(sPort, sIP);
+
+    buffer = new PacketBuffer();
+    // dataBuffer = new PacketBuffer();
+    // ackBuffer = new PacketBuffer();
+
     receivePackets();
+
+    RTPUtil.stall();
 
     acceptConnections();
     listenForGet();
     listenForData();
+    listenForAck();
     listenForFin();
   }
 
@@ -54,7 +65,9 @@ public class RTPServer {
       Print.statusLn("Receiving at " + sIP + ":" + sPort + "...\n");
       for(;;) {
         RTPPacket in = RTPUtil.recvPacket(socket);
-        buffer.put(in);
+        if(in.isType(State.DATA)) buffer.put(in);
+        else if(in.isType(State.ACK)) buffer.put(in);
+        else buffer.put(in);
       }
     }}).start();
   }
@@ -63,16 +76,17 @@ public class RTPServer {
   // Establish connection methods
   //============================================================================
 
-  private void acceptConnections (RTPPacket syn) {
+  private void acceptConnections () {
+    Print.statusLn("\tAccepting SYN requests...");
+
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
-        Print.statusLn("Accepting connections...");
         RTPPacket syn = newConnectionRequest();
 
         Print.recvLn("\tReceived new SYN packet");
         createConnection(syn);
 
-        sendSYNACK(syn, factory);
+        sendSYNACK(syn, factories.get(syn.hash()));
       }
     }}).start();
   }
@@ -86,31 +100,29 @@ public class RTPServer {
         if (!connectionExists)
           return syn;
       }
-      else RTPUtil.wait();
+      else RTPUtil.stall();
     }
   }
 
-  private PacketFactory createConnection(RTPPacket syn) {
+  private void createConnection(RTPPacket syn) {
     int recvWindow = syn.getWindowSize();
     PacketFactory factory = new PacketFactory(sPort, sIP, window, recvWindow);
     factories.put(syn.hash(), factory);
   }
 
   private void sendSYNACK (RTPPacket syn, PacketFactory factory) {
-    RTPPacket synack = factory.createSynAckPacket(syn);
+    RTPPacket synack = factories.get(syn.hash()).createSYNACK(syn);
 
     for(;;) {
       RTPUtil.sendPacket(socket, synack);
       Print.sendLn("\tSent SYNACK Packet");
 
-      RTPUtil.wait();
+      RTPUtil.stall();
 
-      if(buffer.hasGET() || buffer.hasPOST())
-        return;
+      if(factories.get(syn.hash()).isConnected()) return;
 
       Print.infoLn("\tNo response to SYNACK... resending\n");
     }
-    return null;
   }
 
   //============================================================================
@@ -118,69 +130,97 @@ public class RTPServer {
   //============================================================================
 
   private void listenForGet () {
+    Print.statusLn("\tAccepting GET requests...");
+
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
-        Print.statusLn("Accepting GET requests...");
-
         RTPPacket get = newGetRequest();
-        String key = get.getHash();
-        String filename = new String(get.getData());
-        Print.statusLn("Received a new GET request for " + filename);
 
-        RTPService postProcess = new RTPService(socket, factory);
+        String key = get.hash();
+        factories.get(key).setConnected(true);
+
+        String filename = new String(get.getData());
+        Print.statusLn("\tReceived a new GET request for " + filename);
+
+        RTPService postProcess = new RTPService(socket, factories.get(key));
         posts.put(key, postProcess);
 
         byte[] data = RTPUtil.getFileBytes(filename);
-        processOutgoingData(filename, key, data);
+        posts.get(key).startPost(data);
+
+        //processOutgoingData(filename, key, data);
       }
     }}).start();
   }
 
-  private void newGetRequest () {
+  private RTPPacket newGetRequest () {
     for(;;) {
+      RTPUtil.stall();
+
       if(buffer.hasGET()) {
         RTPPacket get = buffer.getGET();
         String key = get.hash();
-        boolean getExists = (gets.get(key) != null);
+        boolean getExists = posts.containsKey(key);
         if (!getExists)
           return get;
       }
-      RTPUtil.wait();
     }
   }
 
-  private void processOutgoingData(String filename, String key, byte[] data) {
-    new Thread(new Runnable() {@Override public void run() {
-      posts.get(key).startPost(data);
+  private void listenForAck () {
+    Print.statusLn("\tAccepting ACKS...");
 
+    new Thread(new Runnable() {@Override public void run() {
       for(;;) {
-        if(posts.get(key).isPostComplete()) {
-          endPOST(filename, key);
-          return;
+        if(buffer.hasACK()) {
+          RTPPacket ack = buffer.getACK();
+          posts.get(ack.hash()).handleAck(ack);
         }
-        else if(buffer.hasACK())
-          posts.get(key).handleAck(buffer.getACK());
         else
-          RTPUtil.wait();
+          RTPUtil.stall();
       }
     }}).start();
   }
 
-  private void endPOST(String filename, String key) {
-    Print.statusLn("POST process completed for " + filename);
-  }
+    // private void processOutgoingData(String filename, String key, byte[] data) {
+  //   new Thread(new Runnable() {@Override public void run() {
+  //     posts.get(key).startPost(data);
+  //
+  //     for(;;) {
+  //       if(posts.get(key).isPostComplete()) {
+  //         endPOST(filename, key);
+  //         return;
+  //       }
+  //       else if(buffer.hasACK()) {
+  //         Print.statusLn("buffer has ack");
+  //         RTPPacket ack = buffer.getACK();
+  //         posts.get(ack.hash()).handleAck(buffer.getACK());
+  //       }
+  //       else
+  //         RTPUtil.stall();
+  //     }
+  //   }}).start();
+  // }
+
+  // private void endPOST(String filename, String key) {
+  //   Print.statusLn("POST process completed for " + filename);
+  // }
 
   //============================================================================
   // Data get methods
   //============================================================================
 
   private void listenForData () {
+    Print.statusLn("\tAccepting incoming DATA packets...");
+
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
-        if(buffer.hasDATAFIN()) handleDataFin();
-        else if(buffer.hasDATA()) handleData();
-        else RTPUtil.wait();
+        if(buffer.hasDATA()) handleData();
+        else RTPUtil.stall();
       }
+    }}).start();
+    new Thread(new Runnable() {@Override public void run() {
+      listenForGetFinish();
     }}).start();
   }
 
@@ -193,7 +233,7 @@ public class RTPServer {
       createGetProcess(key, data);
   }
 
-  private void openProcess (String key) {
+  private boolean openProcess (String key) {
     Boolean openGetProcess = gets.containsKey(key);
     return openGetProcess;
   }
@@ -212,16 +252,21 @@ public class RTPServer {
     gets.get(key).handleData(data);
   }
 
-  private void handleDataFin () {
-    RTPPacket dataFin = buffer.getDATAFIN();
-    String key = dataFin.hash();
-    if(openProcess(key))
-      endGET(key);
+  private void listenForGetFinish () {
+    new Thread(new Runnable() {@Override public void run() {
+      for(;;) {
+        Object[] keys = gets.keySet().toArray();
+        for(Object key : keys) {
+          boolean finished = gets.get(key.toString()).isGetComplete();
+          if(finished) endGet(key.toString());
+        }
+        RTPUtil.stall();
+      }
+    }}).start();
   }
 
-  private void endGET(String key) {
+  private void endGet(String key) {
     Print.statusLn("Get process complete.");
-    gets.get(key).endGetProcess();
     byte[] data = gets.get(key).getData();
     RTPUtil.createPOSTFile("ship.jpg", data);
   }
@@ -230,9 +275,13 @@ public class RTPServer {
   // End connection methods
   //============================================================================
 
-  private void listenForFin (RTPPacket syn) {
-    new Thread(new Runnable() {@Override public void run() {
+  private void listenForFin () {
+    //new Thread(new Runnable() {@Override public void run() {
+      Print.statusLn("\tAccepting FIN requests...");
+
       for(;;) {
+        RTPUtil.stall();
+
         RTPPacket fin = newFIN();
         String key = fin.hash();
         PacketFactory factory = factories.remove(key);
@@ -240,21 +289,22 @@ public class RTPServer {
 
         Print.statusLn("Connection terminated with " + fin.hash());
       }
-    }}).start();
+    //}}).start();
   }
 
   private RTPPacket newFIN () {
     for(;;) {
+      RTPUtil.stall();
+
       if(buffer.hasFIN()) {
         RTPPacket fin = buffer.getFIN();
-        String key = syn.hash();
+        String key = fin.hash();
         boolean connectionExists = (factories.get(key) != null);
         if (!connectionExists) {
           Print.recvLn("\tReceived new FIN packet");
           return fin;
         }
       }
-      RTPUtil.wait();
     }
   }
 

@@ -2,6 +2,7 @@ package fta;
 
 import java.util.Scanner;
 import java.io.*;
+import java.nio.file.*;
 
 import util.*;
 import rtpProtocol.*;
@@ -9,56 +10,58 @@ import rtpProtocol.*;
 public class FTAClient {
 
   private static RTPClient client;
-  private static Scanner scanner;
 
   public static void run (Scanner scanner) {
-    this.scanner = scanner;
 
     Print.promptLn("Running client...\n");
-    startClientPrompt();
-    startClientCommandsPrompt();
+    scanner.nextLine();
+    startClientPrompt(scanner);
+    startClientCommandsPrompt(scanner);
 
   }
 
-  public static void startClientPrompt () {
+  public static void startClientPrompt (Scanner scanner) {
     Print.promptLn("Please start the client:");
     Print.promptLn("\tfta-client [Server IP Address]:[Server Port Number] [Window Size in Bytes]\n");
 
     String command = scanner.nextLine();
     String[] args = command.split(" ");
-    String[] serverAddressAndPort = args[1].split(":");
     boolean validCommand = (args.length == 3) &&
-                           (serverAddressAndPort.length == 2) &&
                            args[0].equalsIgnoreCase("fta-client");
 
-    if (validCommand) {
-      start(serverAddressAndPort[0],
-            Integer.parseInt(serverAddressAndPort[2]),
-            Integer.parseInt(args[2]));
-      return;
+    if(validCommand) {
+      String[] serverAddressAndPort = args[1].split(":");
+      validCommand = validCommand && (serverAddressAndPort.length == 2);
+
+      if (validCommand) {
+        start(serverAddressAndPort[0],
+              Integer.parseInt(serverAddressAndPort[1]),
+              Integer.parseInt(args[2]));
+        return;
+      }
     }
 
     Print.errorLn("Invalid command.\n");
-    Print.startClientPrompt();
+    startClientPrompt(scanner);
   }
 
-  public static void startClientCommandsPrompt () {
+  public static void startClientCommandsPrompt (Scanner scanner) {
     Print.promptLn("Accepted client commands:");
     Print.promptLn("\tget [filename]\n" +
                    "\tget-post [get filname] [post filename]\n" +
                    "\tdisconnect\n");
 
     String command = scanner.nextLine();
-    String[] args = command.split();
+    String[] args = command.split(" ");
 
-    boolean validCommand = !(args.length < 1) && !(args.length > 3) && (
+    boolean validCommand = (args.length > 1) && (args.length < 3) && (
                             (args[0].equalsIgnoreCase("get") && args.length == 2 && filesExist(args[1])) ||
                             (args[0].equalsIgnoreCase("get-post") && args.length == 3 && filesExist(args[1], args[2])) ||
                             (args[0].equalsIgnoreCase("disconnect") && args.length == 1));
 
     if (validCommand) {
       args[0] = args[0].toLowerCase();
-      switch (p[0]) {
+      switch (args[0]) {
         case "get":        get(args[1]);
                            return;
         case "get-post":   getPost(args[1], args[2]);
@@ -69,13 +72,15 @@ public class FTAClient {
     }
 
     Print.errorLn("Invalid command.\n");
-    startClientCommandsPrompt();
+    startClientCommandsPrompt(scanner);
   }
 
   public static boolean filesExist (String... files) {
     try {
-      for(String filename : files)
+      for(String filename: files) {
         Path path = Paths.get("src/fta/" + filename);
+        Files.readAllBytes(path);
+      }
       return true;
     }
     catch (IOException e) {
@@ -93,7 +98,7 @@ public class FTAClient {
   }
 
   public static void get (String getFile) {
-    Print.promptLn("Downloading file " + filename + "...\n");
+    Print.promptLn("Downloading file " + getFile + "...\n");
     client.get(getFile);
   }
 

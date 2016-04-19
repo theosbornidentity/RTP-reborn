@@ -8,21 +8,16 @@ import rtpProtocol.*;
 public class FTAServer {
 
   private static RTPServer server;
-  private static Scanner scanner;
 
   public static void run (Scanner scanner) {
-    this.scanner = scanner;
-
-    Print.promptLn("Running server...\n");
-    startServerPrompt();
-    startClientCommandsPrompt();
-
+    Print.promptLn("Running RTPServer...\n");
+    scanner.nextLine();
+    startServerPrompt(scanner);
   }
 
-  public static void startServerPrompt() {
+  public static void startServerPrompt(Scanner scanner) {
     Print.promptLn("Please start the server:\n" +
                    "\tfta-server [Port Number] [Window Size in Bytes > 1000]\n");
-
     String command = scanner.nextLine();
     String[] args = command.split(" ");
     boolean validCommand = (args.length == 3) &&
@@ -35,11 +30,11 @@ public class FTAServer {
     }
 
     Print.errorLn("Invalid command.");
-    startServerPrompt();
+    startServerPrompt(scanner);
   }
 
   public static void start(int sPort, int window) {
-    Print.promptLn("Starting client...\n" +
+    Print.promptLn("Starting server...\n" +
                    "\tPort: " + sPort + "\n" +
                    "\tWindow Size: " + window + "\n");
     server = new RTPServer(sPort, window);

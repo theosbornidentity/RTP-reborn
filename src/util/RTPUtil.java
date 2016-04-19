@@ -104,6 +104,14 @@ public class RTPUtil {
     return toReturn;
   }
 
+  public static void delay() {
+    try {
+      Thread.sleep(1);
+    } catch(InterruptedException e) {
+      Print.errorLn(e.getMessage());
+    }
+  }
+
   public static void delay(int d) {
     try {
       Thread.sleep(d);
@@ -112,9 +120,17 @@ public class RTPUtil {
     }
   }
 
-  public static void wait() {
+  public static void stall() {
     try {
       Thread.sleep(100);
+    } catch(InterruptedException e) {
+      Print.errorLn(e.getMessage());
+    }
+  }
+
+  public static void stall(int t) {
+    try {
+      Thread.sleep(t);
     } catch(InterruptedException e) {
       Print.errorLn(e.getMessage());
     }
@@ -184,25 +200,20 @@ public class RTPUtil {
   }
 
   public static byte[] buildDataFromHash(int totalBytes, HashMap<Integer, RTPPacket> packets) {
-    int[] seqNums = Arrays.sort(packets.keySet().toArray());
+    Object[] seqNums = packets.keySet().toArray();
+    Arrays.sort(seqNums);
+
     ByteBuffer buff = ByteBuffer.allocate(totalBytes);
     byte[] toReturn = new byte[totalBytes];
-    for(RTPPacket p: packets) {
-      byte[] data = p.getData();
+
+    for(Object seqNum: seqNums) {
+      byte[] data = packets.get((int) seqNum).getData();
       buff.put(data);
     }
+
     buff.flip();
     buff.get(toReturn);
     return toReturn;
   }
 
-  private static void addToDataBuffer(byte[] data) {
-    if(dataBuffer == null) dataBuffer = new byte[0];
-    ByteBuffer buff = ByteBuffer.allocate(dataBuffer.length + data.length);
-    buff.put(dataBuffer);
-    buff.put(data);
-    buff.flip();
-    dataBuffer = new byte[buff.remaining()];
-    buff.get(dataBuffer);
-  }
 }

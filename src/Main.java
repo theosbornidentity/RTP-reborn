@@ -14,7 +14,6 @@ public class Main {
       String command = scanner.next();
 
       if (command.equalsIgnoreCase("server")) {
-        Print.statusLn("Running RTPServer...\n");
         FTAServer.run(scanner);
         return;
       }

@@ -8,12 +8,22 @@ public class PacketFactory {
 
   private String sIP, dIP;
   private int sPort, dPort, window, recvWindow, seqNum, ackNum;
+  private boolean connected;
 
+  public PacketFactory(int sPort, String sIP, int window) {
+    this.sPort = sPort;
+    this.sIP = sIP;
+    this.window = window;
+    this.recvWindow = recvWindow;
+
+    this.seqNum = ThreadLocalRandom.current().nextInt(0, 10000);
+    this.ackNum = 0;
+  }
 
   public PacketFactory(int sPort, String sIP, int window, int recvWindow) {
     this.sPort = sPort;
     this.sIP = sIP;
-    this.window = win;
+    this.window = window;
     this.recvWindow = recvWindow;
 
     this.seqNum = ThreadLocalRandom.current().nextInt(0, 10000);
@@ -22,6 +32,18 @@ public class PacketFactory {
 
   public int getRecvWindow () {
     return this.recvWindow;
+  }
+
+  public void setRecvWindow (int recvWindow) {
+    this.recvWindow = recvWindow;
+  }
+
+  public boolean isConnected () {
+    return this.connected;
+  }
+
+  public void setConnected (boolean conn) {
+    this.connected = conn; 
   }
 
   public RTPPacket createSYN (int dPort, String dIP) {
@@ -34,7 +56,7 @@ public class PacketFactory {
     this.dPort = syn.getSourcePort();
     this.dIP = syn.getSourceIP();
     this.ackNum = syn.getSeqNum();
-    return createAckPacket(State.SYNACK);
+    return createACK(State.SYNACK);
   }
 
   public RTPPacket createGET (byte[] filename) {
@@ -49,9 +71,9 @@ public class PacketFactory {
     return toReturn;
   }
 
-  public RTPPacket createAckPacket(RTPPacket in) {
+  public RTPPacket createACK (RTPPacket in) {
     this.ackNum = in.getSeqNum();
-    return createAckPacket(State.ACK);
+    return createACK(State.ACK);
   }
 
   public RTPPacket createFinPacket () {
@@ -60,21 +82,21 @@ public class PacketFactory {
 
   public RTPPacket createFinAckPacket (RTPPacket fin) {
     this.ackNum = fin.getSeqNum();
-    return createAckPacket(State.FINACK);
+    return createACK(State.FINACK);
   }
 
-  private RTPPacket createPacket(State code) {
+  private RTPPacket createPacket (State code) {
     RTPPacket toSend = new RTPPacket(window, code.ordinal(), seqNum, ackNum, sPort, dPort, sIP, dIP);
     this.seqNum += toSend.getPacketHeader().getPacketSize();
     return toSend;
   }
 
-  private RTPPacket createAckPacket(State code) {
+  private RTPPacket createACK (State code) {
     RTPPacket toSend = new RTPPacket(window, code.ordinal(), seqNum, ackNum, sPort, dPort, sIP, dIP);
     return toSend;
   }
 
-  private RTPPacket createPacket(State code, byte[] data) {
+  private RTPPacket createPacket (State code, byte[] data) {
     RTPPacket toSend = new RTPPacket(window, code.ordinal(), seqNum, ackNum, sPort, dPort, sIP, dIP, data);
     this.seqNum += toSend.getPacketHeader().getPacketSize();
     return toSend;

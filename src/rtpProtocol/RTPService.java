@@ -12,16 +12,17 @@ public class RTPService {
   private PacketFactory factory;
   private int recvWindow;
 
-  private int numUnackedBytes;
-  private ArrayList<RTPPacket> packetsToSend;
-  private ArrayList<RTPPacket> unackedPackets;
+  private int unackedBytes;
+  private HashMap<Integer, RTPPacket> packetsToSend;
+  private HashMap<Integer, Boolean> acked;
   private boolean postComplete;
 
-  private int recvDataBytes, recvTimer;
-  private Hashmap<Integer, RTPPacket> receivedPackets;
+  private int recvDataBytes;
+  private long lastRecvTime;
+  private HashMap<Integer, RTPPacket> receivedPackets;
   private boolean getComplete;
 
-  public PacketService (DatagramSocket socket, PacketFactory factory) {
+  public RTPService (DatagramSocket socket, PacketFactory factory) {
     this.socket = socket;
     this.factory = factory;
     this.recvWindow = factory.getRecvWindow();
@@ -33,41 +34,40 @@ public class RTPService {
 
   public void startGet () {
     getComplete = false;
-    recvTimer = 0;
-    this.receivedPackets = Hashmap<Integer, RTPPacket>();
+    lastRecvTime = System.currentTimeMillis();
+    this.receivedPackets = new HashMap<Integer, RTPPacket>();
+
+    new Thread(new Runnable() {@Override public void run() {
+      updateGetStatus();
+    }}).start();
   }
 
-  private RTPPacket getNextPacket (int seqNum) {
-    int timer = 0;
-    for (;;) {
-      if(timer > 50) getComplete = true;
-      boolean received = receivedPackets.containsKey(seqNum);
-      if(received) return receivedPackets.get(seqNum);
-      else {
-        RTPUtil.wait();
-        waitTime++;
+  public boolean handleData (RTPPacket data) {
+    if(getComplete) return true;
+    Boolean notReceived = !receivedPackets.containsKey(data.getSeqNum());
+    if(notReceived) bufferData(data);
+    sendAck(data);
+    return false;
+  }
+
+  private void updateGetStatus () {
+    for(;;) {
+      RTPUtil.stall();
+
+      boolean noRecentUpdate = (System.currentTimeMillis() - lastRecvTime) > 5000;
+
+      if(noRecentUpdate) {
+        getComplete = true;
+        Print.statusLn("GET completed.");
+        return;
       }
     }
   }
 
-  public void handleData (RTPPacket data) {
-    updateGetStatus();
-    if(getComplete) return;
-    Boolean notReceived = !receivedPackets.containsKey(data.getSeqNum());
-    if(notReceived) bufferData(data);
-    sendAck(data);
-  }
-
-  private void updateGetStatus () {
-    if(recvTimer > 50) {
-      getComplete = true;
-      Print.statusLn("GET completed.");
-      return;
-    }
-  }
-
   private void bufferData (RTPPacket data) {
-    String key = data.getSeqNum();
+    lastRecvTime = System.currentTimeMillis();
+
+    int key = data.getSeqNum();
     receivedPackets.put(key, data);
     recvDataBytes += data.getDataSize();
     Print.recv("\tReceived packet " + key + " ");
@@ -75,9 +75,9 @@ public class RTPService {
   }
 
   private void sendAck(RTPPacket data) {
-    recvTimer = 0;
     RTPPacket ack = factory.createACK(data);
     RTPUtil.sendPacket(socket, ack);
+    Print.sendLn("\tSent ACK " + ack.getAckNum());
   }
 
   public boolean isGetComplete () {
@@ -93,81 +93,90 @@ public class RTPService {
   //============================================================================
 
   public void startPost (byte[] data) {
-    postComplete = false;
-
-    numPacketsSent = 0;
-    numUnackedBytes = 0;
-
-    packetsToSend = packetize(data);
-    unackedPackets = new ArrayList<RTPPacket>();
-
-    sendData(packetsToSend);
-    resendData();
+    new Thread(new Runnable() {@Override public void run() {
+      if(postComplete) return;
+      postComplete = false;
+      unackedBytes = 0;
+      packetsToSend = packetize(data);
+      acked = new HashMap<Integer, Boolean>();
+      sendData();
+    }}).start();
   }
 
-  private void packetize(data) {
+  private HashMap<Integer, RTPPacket> packetize (byte[] data) {
     HashMap<Integer, RTPPacket> toReturn = new HashMap<Integer, RTPPacket>();
 
-    RTPPacket[] dataPackets = factory.packageBytes();
-    toReturn.addAll(dataPackets);
+    RTPPacket[] dataPackets = factory.packageBytes(data);
+    for(RTPPacket p : dataPackets)
+      toReturn.put(p.getSeqNum(), p);
 
     Print.statusLn("\tPackets to send: " + toReturn.size());
     return toReturn;
   }
 
-  private void sendData (ArrayList<RTPPacket> toSend) {
-    new Thread(new Runnable() {@Override public void run() {
-      for(RTPPacket p : toSend) {
-        int bytesOut = unackedBytes + p.getSize();
-        boolean recvWindowFull = (bytesOut > recvWindow);
-
-        if(!recvWindowFull) {
-          RTPUtil.sendPacket(socket, p);
-          unackedBytes += p.getSize();
-          unackedPackets.add(p);
-          Print.send("\tSent packet " + p.getSeqNum());
-          Print.infoLn(" " + unackedPackets.size() + ":" + unackedBytes);
-        }
-
-        else {
-          Print.infoLn("\tReceiver window full.");
-        }
-      }
-    }}).start();
+  private void sendData () {
+    Object[] packetList = packetsToSend.values().toArray();
+    for(Object p : packetList)
+      sendPacket((RTPPacket) p);
+    while(!postComplete)
+      postComplete = resendUnacked();
   }
 
-  private void resendData () {
-    new Thread(new Runnable() {@Override public void run() {
-      int timer = 0;
-      while(!postComplete) {
-        boolean hasUnackedPackets = !unackedPackets.isEmpty();
-        if(hasUnackedPackets) {
-          Print.sendLn("\tResending " + unackedPackets.size() + " packets.")
-          sendData(unackedPackets);
-          timer++;
-        }
-        else {
-          Print.statusLn("\tNo unacked packets.")
-          RTPUtil.wait();
-          timer++;
-        }
-        if(timer > 50) postComplete = true;
+
+  private void sendPacket(RTPPacket p) {
+    for(;;) {
+      int bytesOut = unackedBytes + p.getSize();
+      boolean recvWindowFull = (bytesOut > recvWindow);
+
+      if(!recvWindowFull) {
+        RTPUtil.sendPacket(socket, p);
+        unackedBytes += p.getSize();
+        Print.send("\tSent packet " + p.getSeqNum());
+        Print.infoLn(" " + unackedBytes);
+        return;
       }
-    }}).start();
+      else {
+        Print.infoLn("\tReceiver window full.");
+        RTPUtil.stall();
+      }
+    }
+  }
+
+  private boolean resendUnacked() {
+    boolean allAcked = true;
+    Object[] packetList = packetsToSend.values().toArray();
+    for(Object p: packetList) {
+      RTPPacket packet = (RTPPacket) p;
+      boolean unacked = !(acked.get(packet.getSeqNum()) != null);
+      if(unacked) {
+        sendPacket(packet);
+        allAcked = false;
+      }
+    }
+    return false;
   }
 
   public void handleAck (RTPPacket ack) {
-    int dataSeqNum = ack.getAckNum();
-    for(RTPPacket p : unackedPackets) {
-      if(p.getSeqNum == dataSeqNum) {
-        unackedPackets.remove(p);
-        unackedBytes -= p.getSize();
-        return;
-      }
-    }
+    int seqNum = ack.getAckNum();
+    Print.recvLn("\tAck received " + seqNum);
+    acked.put(seqNum, true);
+    unackedBytes -= packetsToSend.get(seqNum).getSize();
   }
 
   public boolean isPostComplete() {
     return postComplete;
   }
 }
+
+// private RTPPacket getNextPacket (int seqNum) {
+//   int timer = 0;
+//   for (;;) {
+//     if(timer > 50) getComplete = true;
+//     boolean received = receivedPackets.containsKey(seqNum);
+//     if(received) return receivedPackets.get(seqNum);
+//     else {
+//       RTPUtil.stall();
+//       timer++;
+//     }
+//   }
+// }

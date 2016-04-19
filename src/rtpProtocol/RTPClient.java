@@ -9,10 +9,15 @@ public class RTPClient {
 
   private String sIP, dIP;
   private int sPort, dPort;
-  private int window, recvWindow;
+  private int window;
 
   private DatagramSocket socket;
+
   private PacketBuffer buffer;
+  private PacketBuffer dataBuffer;
+  private PacketBuffer ackBuffer;
+
+  private PacketFactory factory;
   private RTPService getProcess;
   private RTPService postProcess;
 
@@ -27,6 +32,8 @@ public class RTPClient {
     this.window = window;
 
     this.buffer = new PacketBuffer();
+    this.dataBuffer = new PacketBuffer();
+    this.ackBuffer = new PacketBuffer();
 
   }
 
@@ -43,7 +50,9 @@ public class RTPClient {
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
         RTPPacket in = RTPUtil.recvPacket(socket);
-        buffer.put(in);
+        if(in.isType(State.DATA)) dataBuffer.put(in);
+        else if(in.isType(State.ACK)) ackBuffer.put(in);
+        else buffer.put(in);
       }
     }}).start();
   }
@@ -66,23 +75,25 @@ public class RTPClient {
   private boolean connect () {
     if(this.connected) return false;
 
+    this.factory = new PacketFactory(sPort, sIP, window);
+
     RTPPacket synack = sendSYN();
-    this.recvWindow = synack.getWindowSize();
-    this.factory = new PacketFactory(sPort, sIP, window, recvWindow);
+    int recvWindow = synack.getWindowSize();
+    factory.setRecvWindow(recvWindow);
 
     Print.statusLn("Connected to server at " + this.dIP + ":" + this.dPort +
-                   "\tWindow size " + this.recvWindow + "\n");
+                   "\n\tWindow size " + recvWindow + "\n");
     return true;
   }
 
   private RTPPacket sendSYN () {
-    RTPPacket syn = factory.createSynPacket(dPort, dIP);
+    RTPPacket syn = factory.createSYN(dPort, dIP);
 
     for(;;) {
       RTPUtil.sendPacket(socket, syn);
       Print.sendLn("\tSent SYN Packet");
 
-      RTPUtil.wait();
+      RTPUtil.stall();
 
       if(buffer.hasSYNACK()) {
         Print.recvLn("\tReceived SYNACK Packet\n");
@@ -91,7 +102,6 @@ public class RTPClient {
 
       Print.infoLn("\tNo response to SYN... resending\n");
     }
-    return null;
   }
 
   //============================================================================
@@ -108,7 +118,7 @@ public class RTPClient {
     getProcess.startGet();
 
     if(this.connected) {
-      sendGET(filename);
+      sendGet(filename);
       processIncomingData(filename);
     }
   }
@@ -125,7 +135,7 @@ public class RTPClient {
 
     if(this.connected) {
       new Thread(new Runnable() {@Override public void run() {
-        sendGET(filename);
+        sendGet(getFilename);
         processIncomingData(getFilename);
       }}).start();
 
@@ -134,25 +144,25 @@ public class RTPClient {
       processOutgoingData(postFilename, data);
     }
   }
-  
+
   //============================================================================
   // Methods for GET
   //============================================================================
 
   private RTPService createConnectionService () {
-    return RTPService (socket, factory);
+    return new RTPService (socket, factory);
   }
 
-  private void sendGET (String filename) {
-    RTPPacket get = factory.createGetPacket(filename.getBytes());
+  private void sendGet (String filename) {
+    RTPPacket get = factory.createGET(filename.getBytes());
 
     for(;;) {
       RTPUtil.sendPacket(socket, get);
       Print.sendLn("\tSent GET Packet for " + filename);
 
-      RTPUtil.wait();
+      RTPUtil.stall();
 
-      if(buffer.hasDATA()) {
+      if(dataBuffer.hasDATA()) {
         Print.statusLn("\tIncoming data...\n");
         return;
       }
@@ -164,21 +174,21 @@ public class RTPClient {
   private void processIncomingData (String filename) {
     for(;;) {
       if(getProcess.isGetComplete()) {
-        endGET(filename);
+        endGet(filename);
         return;
       }
-      else if(buffer.hasDATA())
-        getProcess.handleData(buffer.getDATA());
+      else if(dataBuffer.hasDATA())
+        getProcess.handleData(dataBuffer.getDATA());
       else
-        RTPUtil.wait();
+        RTPUtil.stall();
     }
   }
 
-  private void endGET (String filename) {
+  private void endGet (String filename) {
     Print.statusLn("GET process completed for " + filename);
     byte[] data = getProcess.getData();
     getProcess = null;
-    RTPUtil.createGETFile(filename);
+    RTPUtil.createGETFile(filename, data);
     getComplete = true;
   }
 
@@ -195,10 +205,10 @@ public class RTPClient {
         endPOST(filename);
         return;
       }
-      else if(buffer.hasACK())
-        postProcess.handleAck(buffer.getACK());
+      else if(ackBuffer.hasACK())
+        postProcess.handleAck(ackBuffer.getACK());
       else
-        RTPUtil.wait();
+        RTPUtil.stall();
     }
   }
 
@@ -207,18 +217,6 @@ public class RTPClient {
     //sendDataFin();
     postProcess = null;
     postComplete = true;
-  }
-
-  private boolean recvDataFinAck(String filename) {
-    if(buffer.hasDATAFIN()) {
-      RTPPacket datafinack = buffer.getDATAFIN();
-      String ackedFile = new String(datafinack.getData());
-      if(ackedFile.equals(filename)) {
-        Print.statusLn("\tServer acked DATAFIN...\n");
-        return true;
-      }
-    }
-    return false;
   }
 
   //============================================================================
@@ -232,7 +230,7 @@ public class RTPClient {
       RTPUtil.sendPacket(socket, fin);
       Print.sendLn("\tSent FIN Packet");
 
-      RTPUtil.wait();
+      RTPUtil.stall();
 
       if(buffer.hasFINACK()) {
         Print.recvLn("\tReceived FINACK Packet\n");
@@ -241,7 +239,6 @@ public class RTPClient {
 
       Print.infoLn("\tNo response to FIN... resending\n");
     }
-    return null;
   }
 }
 
@@ -252,7 +249,7 @@ public class RTPClient {
   //     RTPUtil.sendPacket(socket, post);
   //     Print.sendLn("\tSent POST Packet for " + filename);
   //
-  //     RTPUtil.wait();
+  //     RTPUtil.stall();
   //
   //     if(buffer.hasACK()) {
   //       boolean isPostAck = buffer.getACK().getAckNum() == data.length;
@@ -273,7 +270,7 @@ public class RTPClient {
 //     RTPUtil.sendPacket(socket, datafin);
 //     Print.sendLn("\tSent DATAFIN Packet for " + filename);
 //
-//     RTPUtil.wait();
+//     RTPUtil.stall();
 //
 //     if(recvDataFinAck(filename))
 //       return;
