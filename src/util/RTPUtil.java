@@ -3,6 +3,8 @@ package util;
 import java.net.*;
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.BufferOverflowException;
+
 import java.util.*;
 import java.nio.file.*;
 import java.util.zip.Adler32;
@@ -58,14 +60,14 @@ public class RTPUtil {
       InetAddress dIP = InetAddress.getByName(in.getPacketHeader().getDestIP());
       int dPort = in.getPacketHeader().getDestPort();
       DatagramPacket sendDatagram = new DatagramPacket(bytes, bytes.length, dIP, dPort);
-      delay(10);
+      //delay(10);
       Random rand = new Random();
       int testDrop = rand.nextInt(100);
-      if(testDrop <= 90) {
+      if(testDrop <= 94) {
         testDelay();
         s.send(sendDatagram);
       } else {
-        Print.errorLn("\tWhoops, I seemed to have misplaced your packet....");
+        Print.errorLn("\tWhoops, I seemed to have misplaced your packet " + in.getSeqNum());
       }
       return in.getSize();
     }
@@ -84,7 +86,7 @@ public class RTPUtil {
   private static byte[] testCorruption(byte[] bytes) {
     Random rand = new Random();
     int testRand = rand.nextInt(100);
-    if(testRand <= 90) {
+    if(testRand <= 94) {
       return bytes;
     } else {
       Print.errorLn("\tCorrupting packet!!! Muaha..");
@@ -131,18 +133,26 @@ public class RTPUtil {
   }
 
   private static RTPPacket verifyWithCheckSum(byte[] bytes) {
-    RTPPacket toReturn = new RTPPacket();
+    try {
+      RTPPacket toReturn = new RTPPacket();
 
-    ByteBuffer buff = ByteBuffer.wrap(bytes);
-    long checksum = buff.getLong();
-    byte[] withoutChecksum = new byte[buff.remaining()];
-    buff.get(withoutChecksum);
-    toReturn.buildFromBytes(withoutChecksum);
+      ByteBuffer buff = ByteBuffer.wrap(bytes);
+      long checksum = buff.getLong();
+      byte[] withoutChecksum = new byte[buff.remaining()];
+      buff.get(withoutChecksum);
+      toReturn.buildFromBytes(withoutChecksum);
 
-    if(checksum == getChecksum(toReturn.toBytes()))
-      return toReturn;
+      if(checksum == getChecksum(toReturn.toBytes()))
+        return toReturn;
 
-    return null;
+      Print.infoLn("\tDisposing of corrputed packet.");
+      return null;
+   }
+   catch (BufferOverflowException e) {
+      Print.infoLn("\tLost bytes, buffer overflow exception. Disposing.");
+      return null;
+   }
+
   }
 
   public static byte[][] splitData(byte[] data) {
@@ -252,7 +262,7 @@ public class RTPUtil {
   public static void testDelay() {
     Random rand = new Random();
     try {
-      Thread.sleep(rand.nextInt(100));
+      Thread.sleep(rand.nextInt(50));
     } catch(InterruptedException e) {
       Print.errorLn(e.getMessage());
     }

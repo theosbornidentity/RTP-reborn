@@ -71,14 +71,14 @@ public class RTPService {
     int key = data.getSeqNum();
     receivedPackets.put(key, data);
     recvDataBytes += data.getDataSize();
-    Print.recv("\tReceived packet " + key + " ");
-    Print.infoLn(recvDataBytes);
+    Print.recv("\tReceived packet " + key + ".");
+    Print.infoLn("\tTotal bytes received: " + recvDataBytes);
   }
 
   private void sendAck(RTPPacket data) {
     RTPPacket ack = factory.createACK(data);
     RTPUtil.sendPacket(socket, ack);
-    Print.sendLn("\tSent ACK " + ack.getAckNum());
+    //Print.sendLn("\tSent ACK " + ack.getAckNum());
   }
 
   public boolean isGetComplete () {
@@ -140,8 +140,8 @@ public class RTPService {
           sentPackets.put(p.getSeqNum(), p);
           unackedBytes += p.getSize();
         }
-        Print.send("\tSent packet " + p.getSeqNum());
-        Print.infoLn(" " + unackedBytes);
+        Print.send("\tSent packet " + p.getSeqNum() + ".");
+        Print.infoLn("\tUnacked bytes: " + unackedBytes);
         return;
       }
       else {
@@ -175,7 +175,7 @@ public class RTPService {
     if(acked.get(seqNum) != null) isDuplicate = true;
 
     if(!isDuplicate) {
-      Print.recvLn("\tAck received " + seqNum);
+      //Print.recvLn("\tAck received " + seqNum);
       acked.put(seqNum, true);
       unackedBytes -= ackedPacket.getSize();
     }

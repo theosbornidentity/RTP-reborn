@@ -1,6 +1,7 @@
 package rtpPacket;
 
 import java.nio.ByteBuffer;
+import java.nio.BufferOverflowException;
 
 import util.*;
 
@@ -140,15 +141,19 @@ public class RTPPacket {
   */
 
   public void buildFromBytes(byte[] packet) {
-    ByteBuffer buff = ByteBuffer.wrap(packet);
-    int headerSize = buff.get();
-    buff = ByteBuffer.wrap(packet);
-    byte[] headerBytes = new byte[headerSize];
-    buff.get(headerBytes);
-    this.header.buildFromBytes(headerBytes);
-    byte[] dataBytes = new byte[header.getDataSize()];
-    buff.get(dataBytes);
-    this.data = dataBytes;
+    try {
+      ByteBuffer buff = ByteBuffer.wrap(packet);
+      int headerSize = buff.get();
+      buff = ByteBuffer.wrap(packet);
+      byte[] headerBytes = new byte[headerSize];
+      buff.get(headerBytes);
+      this.header.buildFromBytes(headerBytes);
+      byte[] dataBytes = new byte[header.getDataSize()];
+      buff.get(dataBytes);
+      this.data = dataBytes;
+    } catch (BufferOverflowException e) {
+        Print.errorLn("------------header size corrupted, disposing---------------");
+    }
   }
 
   /**

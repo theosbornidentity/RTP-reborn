@@ -17,6 +17,8 @@ package rtpPacket;
  */
 
 import java.nio.ByteBuffer;
+import java.nio.BufferOverflowException;
+
 import util.*;
 
 public class RTPHeader {
@@ -182,28 +184,37 @@ public class RTPHeader {
   */
 
   public void buildFromBytes(byte[] packet) {
-    ByteBuffer buff = ByteBuffer.wrap(packet);
-    this.headerSize = buff.get();
-    this.packetSize = buff.getShort();
-    this.dataSize = buff.getShort();
-    this.windowSize = buff.getInt();
-    this.code = buff.get();
-    this.seqNum = buff.getInt();
-    this.ackNum = buff.getInt();
-    this.sPort = buff.getInt();
-    this.dPort = buff.getInt();
-    int sLength = buff.get();
-    int dLength = buff.get();
+    //Print.errorLn("header bytes: " + packet.length);
 
-    byte[] bytes = new byte[sLength];
-    buff.get(bytes);
-    this.sIP = new String(bytes);
+    if(packet.length == 0)
+      return;
 
-    buff.position(BASE_LENGTH + sLength);
+    try {
+      ByteBuffer buff = ByteBuffer.wrap(packet);
+      this.headerSize = buff.get();
+      this.packetSize = buff.getShort();
+      this.dataSize = buff.getShort();
+      this.windowSize = buff.getInt();
+      this.code = buff.get();
+      this.seqNum = buff.getInt();
+      this.ackNum = buff.getInt();
+      this.sPort = buff.getInt();
+      this.dPort = buff.getInt();
+      int sLength = buff.get();
+      int dLength = buff.get();
 
-    bytes = new byte[dLength];
-    buff.get(bytes);
-    this.dIP = new String(bytes);
+      byte[] bytes = new byte[sLength];
+      buff.get(bytes);
+      this.sIP = new String(bytes);
+
+      buff.position(BASE_LENGTH + sLength);
+
+      bytes = new byte[dLength];
+      buff.get(bytes);
+      this.dIP = new String(bytes);
+   } catch (BufferOverflowException e) {
+       Print.errorLn("------------header size corrupted, disposing---------------");
+   }
   }
 
   /**
