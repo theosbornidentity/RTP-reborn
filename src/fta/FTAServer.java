@@ -28,8 +28,10 @@ public class FTAServer {
       start(Integer.parseInt(args[1]), Integer.parseInt(args[2]));
       return;
     }
+    else {
+      Print.errorLn("Invalid command.");
+    }
 
-    Print.errorLn("Invalid command.");
     startServerPrompt(scanner);
   }
 

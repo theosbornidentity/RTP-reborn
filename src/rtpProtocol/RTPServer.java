@@ -300,8 +300,8 @@ public class RTPServer {
         RTPPacket fin = buffer.getFIN();
         String key = fin.hash();
         boolean connectionExists = (factories.get(key) != null);
-        if (!connectionExists) {
-          Print.recvLn("\tReceived new FIN packet");
+        if (connectionExists) {
+          Print.recvLn("\tReceived new FIN packet for connection " + key);
           return fin;
         }
       }

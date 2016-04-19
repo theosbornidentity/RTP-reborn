@@ -120,6 +120,7 @@ public class RTPService {
       sendPacket((RTPPacket) p);
     while(!postComplete)
       postComplete = resendUnacked();
+    Print.statusLn("File transfer to client successful.");
   }
 
 
@@ -153,7 +154,7 @@ public class RTPService {
         allAcked = false;
       }
     }
-    return false;
+    return allAcked;
   }
 
   public void handleAck (RTPPacket ack) {

@@ -13,7 +13,7 @@ public class FTAClient {
 
   public static void run (Scanner scanner) {
 
-    Print.promptLn("Running client...\n");
+    Print.promptLn("Running client...");
     scanner.nextLine();
     startClientPrompt(scanner);
     startClientCommandsPrompt(scanner);
@@ -21,7 +21,7 @@ public class FTAClient {
   }
 
   public static void startClientPrompt (Scanner scanner) {
-    Print.promptLn("Please start the client:");
+    Print.promptLn("\nPlease start the client:");
     Print.promptLn("\tfta-client [Server IP Address]:[Server Port Number] [Window Size in Bytes]\n");
 
     String command = scanner.nextLine();
@@ -46,7 +46,7 @@ public class FTAClient {
   }
 
   public static void startClientCommandsPrompt (Scanner scanner) {
-    Print.promptLn("Accepted client commands:");
+    Print.promptLn("\nAccepted client commands:");
     Print.promptLn("\tget [filename]\n" +
                    "\tget-post [get filname] [post filename]\n" +
                    "\tdisconnect\n");
@@ -54,7 +54,7 @@ public class FTAClient {
     String command = scanner.nextLine();
     String[] args = command.split(" ");
 
-    boolean validCommand = (args.length > 1) && (args.length < 3) && (
+    boolean validCommand = (args.length > 0) && (args.length < 3) && (
                             (args[0].equalsIgnoreCase("get") && args.length == 2 && filesExist(args[1])) ||
                             (args[0].equalsIgnoreCase("get-post") && args.length == 3 && filesExist(args[1], args[2])) ||
                             (args[0].equalsIgnoreCase("disconnect") && args.length == 1));
@@ -63,15 +63,17 @@ public class FTAClient {
       args[0] = args[0].toLowerCase();
       switch (args[0]) {
         case "get":        get(args[1]);
-                           return;
+                           break;
         case "get-post":   getPost(args[1], args[2]);
-                           return;
+                           break;
         case "disconnect": disconnect();
-                           return;
+                           break;
       }
     }
+    else {
+      Print.errorLn("Invalid command.\n");
+    }
 
-    Print.errorLn("Invalid command.\n");
     startClientCommandsPrompt(scanner);
   }
 
