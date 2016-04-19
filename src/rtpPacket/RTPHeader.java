@@ -23,6 +23,7 @@ public class RTPHeader {
 
   public static final int BASE_LENGTH = 28;
 
+  private long checksum;
   private byte headerSize;
   private short packetSize;
   private short dataSize;

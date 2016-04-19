@@ -5,6 +5,8 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.nio.file.*;
+import java.util.zip.Adler32;
+import java.util.zip.Checksum;
 
 import rtpPacket.*;
 import util.*;
@@ -51,6 +53,8 @@ public class RTPUtil {
   public static int sendPacket(DatagramSocket s, RTPPacket in) {
     try {
       byte[] bytes = in.toBytes();
+      bytes = addChecksum(in.toBytes());
+      bytes = testCorruption(bytes);
       InetAddress dIP = InetAddress.getByName(in.getPacketHeader().getDestIP());
       int dPort = in.getPacketHeader().getDestPort();
       DatagramPacket sendDatagram = new DatagramPacket(bytes, bytes.length, dIP, dPort);
@@ -60,6 +64,8 @@ public class RTPUtil {
       if(testDrop <= 90) {
         testDelay();
         s.send(sendDatagram);
+      } else {
+        Print.errorLn("\tWhoops, I seemed to have misplaced your packet....");
       }
       return in.getSize();
     }
@@ -75,19 +81,67 @@ public class RTPUtil {
     return -1;
   }
 
+  private static byte[] testCorruption(byte[] bytes) {
+    Random rand = new Random();
+    int testRand = rand.nextInt(100);
+    if(testRand <= 90) {
+      return bytes;
+    } else {
+      Print.errorLn("\tCorrupting packet!!! Muaha..");
+      int indexToCorrupt = rand.nextInt(bytes.length - 1);
+      bytes[indexToCorrupt] = 0;
+      return bytes;
+    }
+  }
+
+  private static byte[] addChecksum(byte[] bytes) {
+    ByteBuffer buff = ByteBuffer.allocate(bytes.length + 8);
+    buff.putLong(getChecksum(bytes))
+        .put(bytes);
+    buff.flip();
+    byte[] toReturn = new byte[buff.remaining()];
+    buff.get(toReturn);
+    return toReturn;
+  }
+
+  private static long getChecksum(byte[] bytes) {
+    Checksum checksumEngine = new Adler32();
+    checksumEngine.update(bytes, 0, bytes.length);
+    return checksumEngine.getValue();
+  }
+
   public static RTPPacket recvPacket(DatagramSocket s) {
     try {
-      byte[] recv = new byte[RTPPacket.MAX_SIZE];
-      DatagramPacket recvDatagram = new DatagramPacket(recv, RTPPacket.MAX_SIZE);
-      s.receive(recvDatagram);
-      RTPPacket toRecv = new RTPPacket();
-      toRecv.buildFromBytes(recv);
-      return toRecv;
+      for(;;) {
+        byte[] recv = new byte[RTPPacket.MAX_SIZE];
+        DatagramPacket recvDatagram = new DatagramPacket(recv, RTPPacket.MAX_SIZE);
+        s.receive(recvDatagram);
+
+        RTPPacket recvPacket;
+        recvPacket = verifyWithCheckSum(recv);
+
+        if(recvPacket != null) return recvPacket;
+      }
     }
     catch (IOException e) {
         Print.error(e.getMessage());
         System.exit(0);
     }
+    return null;
+  }
+
+  private static RTPPacket verifyWithCheckSum(byte[] bytes) {
+    RTPPacket toReturn = new RTPPacket();
+
+    ByteBuffer buff = ByteBuffer.wrap(bytes);
+    long checksum = buff.getLong();
+    byte[] withoutChecksum = new byte[buff.remaining()];
+    buff.get(withoutChecksum);
+    toReturn.buildFromBytes(withoutChecksum);
+
+    if(checksum == getChecksum(toReturn.toBytes()))
+      return toReturn;
+
     return null;
   }
 
