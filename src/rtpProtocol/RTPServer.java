@@ -8,6 +8,8 @@ import util.*;
 
 public class RTPServer {
 
+  private final String FILETOVERIFY = "ship.jpg";
+
   private String sIP;
   private int sPort, window;
 
@@ -147,8 +149,6 @@ public class RTPServer {
 
         byte[] data = RTPUtil.getFileBytes(filename);
         posts.get(key).startPost(data);
-
-        //processOutgoingData(filename, key, data);
       }
     }}).start();
   }
@@ -160,9 +160,17 @@ public class RTPServer {
       if(buffer.hasGET()) {
         RTPPacket get = buffer.getGET();
         String key = get.hash();
+
         boolean getExists = posts.containsKey(key);
         if (!getExists)
           return get;
+
+        boolean existingGetComplete = posts.get(key).isPostComplete();
+        if (existingGetComplete) {
+          posts.remove(key);
+          return get;
+        }
+
       }
     }
   }
@@ -182,30 +190,6 @@ public class RTPServer {
     }}).start();
   }
 
-    // private void processOutgoingData(String filename, String key, byte[] data) {
-  //   new Thread(new Runnable() {@Override public void run() {
-  //     posts.get(key).startPost(data);
-  //
-  //     for(;;) {
-  //       if(posts.get(key).isPostComplete()) {
-  //         endPOST(filename, key);
-  //         return;
-  //       }
-  //       else if(buffer.hasACK()) {
-  //         Print.statusLn("buffer has ack");
-  //         RTPPacket ack = buffer.getACK();
-  //         posts.get(ack.hash()).handleAck(buffer.getACK());
-  //       }
-  //       else
-  //         RTPUtil.stall();
-  //     }
-  //   }}).start();
-  // }
-
-  // private void endPOST(String filename, String key) {
-  //   Print.statusLn("POST process completed for " + filename);
-  // }
-
   //============================================================================
   // Data get methods
   //============================================================================
@@ -219,6 +203,7 @@ public class RTPServer {
         else RTPUtil.stall();
       }
     }}).start();
+
     new Thread(new Runnable() {@Override public void run() {
       listenForGetFinish();
     }}).start();
@@ -247,8 +232,9 @@ public class RTPServer {
 
     PacketFactory factory = factories.get(key);
     RTPService getProcess = new RTPService(socket, factory);
-    gets.put(key, getProcess);
 
+    gets.put(key, getProcess);
+    gets.get(key).startGet();
     gets.get(key).handleData(data);
   }
 
@@ -258,7 +244,10 @@ public class RTPServer {
         Object[] keys = gets.keySet().toArray();
         for(Object key : keys) {
           boolean finished = gets.get(key.toString()).isGetComplete();
-          if(finished) endGet(key.toString());
+          if(finished) {
+            endGet(key.toString());
+            return;
+          };
         }
         RTPUtil.stall();
       }
@@ -268,7 +257,8 @@ public class RTPServer {
   private void endGet(String key) {
     Print.statusLn("Get process complete.");
     byte[] data = gets.get(key).getData();
-    RTPUtil.createPOSTFile("ship.jpg", data);
+    RTPUtil.createPOSTFile(FILETOVERIFY, data);
+    gets.remove(key);
   }
 
   //============================================================================
@@ -276,7 +266,6 @@ public class RTPServer {
   //============================================================================
 
   private void listenForFin () {
-    //new Thread(new Runnable() {@Override public void run() {
       Print.statusLn("\tAccepting FIN requests...");
 
       for(;;) {
@@ -289,7 +278,6 @@ public class RTPServer {
 
         Print.statusLn("Connection terminated with " + fin.hash());
       }
-    //}}).start();
   }
 
   private RTPPacket newFIN () {

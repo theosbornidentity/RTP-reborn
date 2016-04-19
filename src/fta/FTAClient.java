@@ -22,12 +22,13 @@ public class FTAClient {
 
   public static void startClientPrompt (Scanner scanner) {
     Print.promptLn("\nPlease start the client:");
-    Print.promptLn("\tfta-client [Server IP Address]:[Server Port Number] [Window Size in Bytes]\n");
+    Print.promptLn("\tfta-client [Server IP Address]:[Server Port Number] [Window Size in Bytes >= 1000]\n");
 
     String command = scanner.nextLine();
     String[] args = command.split(" ");
     boolean validCommand = (args.length == 3) &&
-                           args[0].equalsIgnoreCase("fta-client");
+                           args[0].equalsIgnoreCase("fta-client") &&
+                           (Integer.parseInt(args[2]) >= 1000);
 
     if(validCommand) {
       String[] serverAddressAndPort = args[1].split(":");
@@ -54,7 +55,7 @@ public class FTAClient {
     String command = scanner.nextLine();
     String[] args = command.split(" ");
 
-    boolean validCommand = (args.length > 0) && (args.length < 3) && (
+    boolean validCommand = (args.length > 0) && (args.length < 4) && (
                             (args[0].equalsIgnoreCase("get") && args.length == 2 && filesExist(args[1])) ||
                             (args[0].equalsIgnoreCase("get-post") && args.length == 3 && filesExist(args[1], args[2])) ||
                             (args[0].equalsIgnoreCase("disconnect") && args.length == 1));

@@ -93,12 +93,13 @@ public class RTPService {
   //============================================================================
 
   public void startPost (byte[] data) {
+    if(postComplete) return;
+    postComplete = false;
+    unackedBytes = 0;
+    acked = new HashMap<Integer, Boolean>();
+    packetsToSend = packetize(data);
+
     new Thread(new Runnable() {@Override public void run() {
-      if(postComplete) return;
-      postComplete = false;
-      unackedBytes = 0;
-      packetsToSend = packetize(data);
-      acked = new HashMap<Integer, Boolean>();
       sendData();
     }}).start();
   }
@@ -120,7 +121,7 @@ public class RTPService {
       sendPacket((RTPPacket) p);
     while(!postComplete)
       postComplete = resendUnacked();
-    Print.statusLn("File transfer to client successful.");
+    Print.statusLn("File POST successful.");
   }
 
 
@@ -158,10 +159,19 @@ public class RTPService {
   }
 
   public void handleAck (RTPPacket ack) {
+    if(ack == null) Print.errorLn("ack == null");
+
     int seqNum = ack.getAckNum();
-    Print.recvLn("\tAck received " + seqNum);
-    acked.put(seqNum, true);
-    unackedBytes -= packetsToSend.get(seqNum).getSize();
+    if(packetsToSend == null) Print.errorLn("packetsToSend == null");
+    RTPPacket ackedPacket = packetsToSend.get(seqNum);
+    if(ackedPacket == null) Print.errorLn("ackedPacket == null");
+
+    if(ackedPacket != null) {
+      Print.recvLn("\tAck received " + seqNum);
+      if(acked == null) Print.errorLn("acked == null");
+      acked.put(seqNum, true);
+      unackedBytes -= ackedPacket.getSize();
+    }
   }
 
   public boolean isPostComplete() {

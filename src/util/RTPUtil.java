@@ -180,7 +180,7 @@ public class RTPUtil {
     }
     boolean passed = true;
     if(bytes.length != original.length)
-      Print.errorLn("Lost bytes in transfer.");
+      Print.errorLn("Lost bytes in transfer " + original.length + ":" + bytes.length);
     else {
       for(int i = 0; i < bytes.length; i++)
         if(bytes[i] != original[i])

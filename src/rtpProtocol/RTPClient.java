@@ -14,8 +14,6 @@ public class RTPClient {
   private DatagramSocket socket;
 
   private PacketBuffer buffer;
-  private PacketBuffer dataBuffer;
-  private PacketBuffer ackBuffer;
 
   private PacketFactory factory;
   private RTPService getProcess;
@@ -32,9 +30,6 @@ public class RTPClient {
     this.window = window;
 
     this.buffer = new PacketBuffer();
-    this.dataBuffer = new PacketBuffer();
-    this.ackBuffer = new PacketBuffer();
-
   }
 
   //============================================================================
@@ -50,9 +45,7 @@ public class RTPClient {
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
         RTPPacket in = RTPUtil.recvPacket(socket);
-        if(in.isType(State.DATA)) dataBuffer.put(in);
-        else if(in.isType(State.ACK)) ackBuffer.put(in);
-        else buffer.put(in);
+        buffer.put(in);
       }
     }}).start();
   }
@@ -131,18 +124,15 @@ public class RTPClient {
       connected = connect();
 
     getProcess = createConnectionService();
+    getProcess.startGet();
+
     postProcess = createConnectionService();
+    byte[] data = RTPUtil.getFileBytes(postFilename);
+    processOutgoingData(data);
 
-    if(this.connected) {
-      new Thread(new Runnable() {@Override public void run() {
-        sendGet(getFilename);
-        processIncomingData(getFilename);
-      }}).start();
+    sendGet(getFilename);
+    processIncomingData(getFilename);
 
-      byte[] data = RTPUtil.getFileBytes(postFilename);
-      //sendPOST(postFilename, data);
-      processOutgoingData(postFilename, data);
-    }
   }
 
   //============================================================================
@@ -162,7 +152,7 @@ public class RTPClient {
 
       RTPUtil.stall();
 
-      if(dataBuffer.hasDATA()) {
+      if(buffer.hasDATA()) {
         Print.statusLn("\tIncoming data...\n");
         return;
       }
@@ -172,16 +162,19 @@ public class RTPClient {
   }
 
   private void processIncomingData (String filename) {
-    for(;;) {
-      if(getProcess.isGetComplete()) {
-        endGet(filename);
-        return;
+    new Thread(new Runnable() {@Override public void run() {
+      for(;;) {
+        if(getProcess.isGetComplete()) {
+          endGet(filename);
+          return;
+        }
+        else if(buffer.hasDATA()){
+          getProcess.handleData(buffer.getDATA());
+        }
+        else
+          RTPUtil.stall();
       }
-      else if(dataBuffer.hasDATA())
-        getProcess.handleData(dataBuffer.getDATA());
-      else
-        RTPUtil.stall();
-    }
+    }}).start();
   }
 
   private void endGet (String filename) {
@@ -197,24 +190,32 @@ public class RTPClient {
   // Methods for POST
   //============================================================================
 
-  private void processOutgoingData(String filename, byte[] data) {
+  private void processOutgoingData(byte[] data) {
     postProcess.startPost(data);
-
-    for(;;) {
-      if(postProcess.isPostComplete()) {
-        endPOST(filename);
-        return;
-      }
-      else if(ackBuffer.hasACK())
-        postProcess.handleAck(ackBuffer.getACK());
-      else
-        RTPUtil.stall();
-    }
+    listenForAck();
   }
 
-  private void endPOST (String filename) {
-    Print.statusLn("POST process completed for " + filename);
-    //sendDataFin();
+  private void listenForAck () {
+    Print.statusLn("\tAccepting ACKS...");
+
+    new Thread(new Runnable() {@Override public void run() {
+      for(;;) {
+        if(postProcess.isPostComplete()) {
+          endPOST();
+          return;
+        }
+        else if(buffer.hasACK()) {
+          RTPPacket ack = buffer.getACK();
+          postProcess.handleAck(ack);
+        }
+        else
+          RTPUtil.stall();
+      }
+    }}).start();
+  }
+
+  private void endPOST () {
+    Print.statusLn("POST process completed");
     postProcess = null;
     postComplete = true;
   }
@@ -241,40 +242,3 @@ public class RTPClient {
     }
   }
 }
-
-  // private void sendPOST (String filename, byte[] data) {
-  //   //Print.statusLn("\tSending " + data.length + " bytes...");
-  //   RTPPacket post = factory.createPostPacket(data);
-  //   for(;;) {
-  //     RTPUtil.sendPacket(socket, post);
-  //     Print.sendLn("\tSent POST Packet for " + filename);
-  //
-  //     RTPUtil.stall();
-  //
-  //     if(buffer.hasACK()) {
-  //       boolean isPostAck = buffer.getACK().getAckNum() == data.length;
-  //       if(isPostAck) {
-  //         Print.statusLn("\tReceived ACK for POST...\n");
-  //         return;
-  //       }
-  //     }
-  //
-  //     Print.infoLn("\tNo response to POST... resending\n");
-  //   }
-  // }
-
-// private void sendDataFin (String filename) {
-//   RTPPacket datafin = factory.createDataFinPacket(filename.getBytes());
-//
-//   for(;;) {
-//     RTPUtil.sendPacket(socket, datafin);
-//     Print.sendLn("\tSent DATAFIN Packet for " + filename);
-//
-//     RTPUtil.stall();
-//
-//     if(recvDataFinAck(filename))
-//       return;
-//
-//     Print.infoLn("\tNo response to DATAFIN... resending\n");
-//   }
-// }
