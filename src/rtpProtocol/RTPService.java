@@ -14,6 +14,7 @@ public class RTPService {
 
   private int unackedBytes;
   private HashMap<Integer, RTPPacket> packetsToSend;
+  private HashMap<Integer, RTPPacket> sentPackets;
   private HashMap<Integer, Boolean> acked;
   private boolean postComplete;
 
@@ -97,6 +98,7 @@ public class RTPService {
     postComplete = false;
     unackedBytes = 0;
     acked = new HashMap<Integer, Boolean>();
+    sentPackets = new HashMap<Integer, RTPPacket>();
     packetsToSend = packetize(data);
 
     new Thread(new Runnable() {@Override public void run() {
@@ -118,27 +120,33 @@ public class RTPService {
   private void sendData () {
     Object[] packetList = packetsToSend.values().toArray();
     for(Object p : packetList)
-      sendPacket((RTPPacket) p);
+      sendPacket((RTPPacket) p, false);
     while(!postComplete)
       postComplete = resendUnacked();
     Print.statusLn("File POST successful.");
   }
 
 
-  private void sendPacket(RTPPacket p) {
+  private void sendPacket(RTPPacket p, boolean isResend) {
     for(;;) {
-      int bytesOut = unackedBytes + p.getSize();
+      int bytesOut;
+      if(!isResend) bytesOut = unackedBytes + p.getSize();
+      else bytesOut = unackedBytes;
       boolean recvWindowFull = (bytesOut > recvWindow);
 
       if(!recvWindowFull) {
         RTPUtil.sendPacket(socket, p);
-        unackedBytes += p.getSize();
+        if(!isResend) {
+          sentPackets.put(p.getSeqNum(), p);
+          unackedBytes += p.getSize();
+        }
         Print.send("\tSent packet " + p.getSeqNum());
         Print.infoLn(" " + unackedBytes);
         return;
       }
       else {
         Print.infoLn("\tReceiver window full.");
+        if(!isResend) resendUnacked();
         RTPUtil.stall();
       }
     }
@@ -146,12 +154,12 @@ public class RTPService {
 
   private boolean resendUnacked() {
     boolean allAcked = true;
-    Object[] packetList = packetsToSend.values().toArray();
+    Object[] packetList = sentPackets.values().toArray();
     for(Object p: packetList) {
       RTPPacket packet = (RTPPacket) p;
       boolean unacked = !(acked.get(packet.getSeqNum()) != null);
       if(unacked) {
-        sendPacket(packet);
+        sendPacket(packet, true);
         allAcked = false;
       }
     }
@@ -159,16 +167,15 @@ public class RTPService {
   }
 
   public void handleAck (RTPPacket ack) {
-    if(ack == null) Print.errorLn("ack == null");
 
     int seqNum = ack.getAckNum();
-    if(packetsToSend == null) Print.errorLn("packetsToSend == null");
     RTPPacket ackedPacket = packetsToSend.get(seqNum);
-    if(ackedPacket == null) Print.errorLn("ackedPacket == null");
 
-    if(ackedPacket != null) {
+    boolean isDuplicate = false;
+    if(acked.get(seqNum) != null) isDuplicate = true;
+
+    if(!isDuplicate) {
       Print.recvLn("\tAck received " + seqNum);
-      if(acked == null) Print.errorLn("acked == null");
       acked.put(seqNum, true);
       unackedBytes -= ackedPacket.getSize();
     }

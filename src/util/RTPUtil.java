@@ -55,7 +55,12 @@ public class RTPUtil {
       int dPort = in.getPacketHeader().getDestPort();
       DatagramPacket sendDatagram = new DatagramPacket(bytes, bytes.length, dIP, dPort);
       delay(10);
-      s.send(sendDatagram);
+      Random rand = new Random();
+      int testDrop = rand.nextInt(100);
+      if(testDrop <= 90) {
+        testDelay();
+        s.send(sendDatagram);
+      }
       return in.getSize();
     }
     catch (UnknownHostException e) {
@@ -193,7 +198,7 @@ public class RTPUtil {
   public static void testDelay() {
     Random rand = new Random();
     try {
-      Thread.sleep(rand.nextInt(10));
+      Thread.sleep(rand.nextInt(100));
     } catch(InterruptedException e) {
       Print.errorLn(e.getMessage());
     }
