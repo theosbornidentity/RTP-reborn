@@ -1,6 +1,8 @@
 package util;
 
-public class Print {
+public class Printer {
+
+  public boolean logging;
 
   public static final String ANSI_RESET = "\u001B[0m";
   public static final String ANSI_BLACK = "\u001B[30m";
@@ -11,6 +13,49 @@ public class Print {
   public static final String ANSI_PURPLE = "\u001B[35m";
   public static final String ANSI_CYAN = "\u001B[36m";
   public static final String ANSI_WHITE = "\u001B[37m";
+
+  public Printer (boolean logging) {
+    this.logging = logging;
+  }
+  //============================================================================
+  // Logging helper methods (Yes, I'm lazy.)
+  //============================================================================
+
+  public void logSend (String s) {
+    if(logging) sendLn(s);
+  }
+
+  public void logSend (String s, int n) {
+    if(!logging) return;
+    send(s + "\t");
+    infoLn(n);
+  }
+
+  public void logReceive (String s) {
+    if(logging) recvLn(s);
+  }
+
+  public void logReceive (String s, int n) {
+    if(!logging) return;
+    recv(s);
+    infoLn("\tTotal bytes: " + n);
+  }
+
+  public void logInfo (String s) {
+    if(logging) infoLn(s);
+  }
+
+  public void logStatus (String s) {
+    statusLn("----\t" + s + "\t----");
+  }
+
+  public void logCorruption (String s) {
+    if(logging) errorLn("----\t" + s + "\t----");
+  }
+
+  public void logError (String s) {
+    errorLn("----\t" + s + "\t----");
+  }
 
   public static void success(Object m) {
     System.out.print(ANSI_GREEN + m.toString() + ANSI_RESET);

@@ -11,18 +11,24 @@ public class FTAClient {
 
   private static RTPClient client;
 
-  public static void run (Scanner scanner) {
+  private static boolean corrupted;
+  private static boolean logging;
 
-    Print.promptLn("Running client...");
+  public static void run (Scanner scanner, boolean c, boolean l) {
+    corrupted = c;
+    logging = l;
+
+    Printer.promptLn("Running client...");
     scanner.nextLine();
-    startClientPrompt(scanner);
-    startClientCommandsPrompt(scanner);
 
+    startClientPrompt(scanner);
+
+    startClientCommandsPrompt(scanner);
   }
 
   public static void startClientPrompt (Scanner scanner) {
-    Print.promptLn("\nPlease start the client:");
-    Print.promptLn("\tfta-client [Server IP Address]:[Server Port Number] [Window Size in Bytes >= 1000]\n");
+    Printer.promptLn("\nPlease start the client:");
+    Printer.promptLn("\tfta-client [Server IP Address]:[Server Port Number] [Window Size in Bytes >= 1000]\n");
 
     String command = scanner.nextLine();
     String[] args = command.split(" ");
@@ -42,13 +48,13 @@ public class FTAClient {
       }
     }
 
-    Print.errorLn("Invalid command.\n");
+    Printer.errorLn("Invalid command.\n");
     startClientPrompt(scanner);
   }
 
   public static void startClientCommandsPrompt (Scanner scanner) {
-    Print.promptLn("\nAccepted client commands:");
-    Print.promptLn("\tget [filename]\n" +
+    Printer.promptLn("\nAccepted client commands:");
+    Printer.promptLn("\tget [filename]\n" +
                    "\tget-post [get filname] [post filename]\n" +
                    "\tdisconnect\n");
 
@@ -72,7 +78,7 @@ public class FTAClient {
       }
     }
     else {
-      Print.errorLn("Invalid command.\n");
+      Printer.errorLn("Invalid command.\n");
     }
 
     startClientCommandsPrompt(scanner);
@@ -87,31 +93,33 @@ public class FTAClient {
       return true;
     }
     catch (IOException e) {
-      Print.errorLn("Could not find one or more files.");
+      Printer.errorLn("Could not find one or more files.");
       return false;
     }
   }
 
   public static void start (String dIP, int dPort, int window) {
-    Print.promptLn("Starting client...\n" +
+    Printer.promptLn("Starting client...\n" +
                    "\tDestination " + dIP + ":" + dPort + "\n" +
                    "\tWindow Size: " + window + "\n");
     client = new RTPClient(dIP, dPort, window);
+    client.setLogging(logging);
+    client.setCorrupted(corrupted);
     client.start();
   }
 
   public static void get (String getFile) {
-    Print.promptLn("Downloading file " + getFile + "...\n");
+    Printer.promptLn("Downloading file " + getFile + "...\n");
     client.get(getFile);
   }
 
   public static void getPost (String getFile, String postFile) {
-    Print.promptLn("Downloading file " + getFile + " and uploading file " + postFile + "...\n");
+    Printer.promptLn("Downloading file " + getFile + " and uploading file " + postFile + "...\n");
     client.getPost(getFile, postFile);
   }
 
   public static void disconnect () {
-    Print.promptLn("Disconnecting from server...\n");
+    Printer.promptLn("Disconnecting from server...\n");
     client.disconnect();
   }
 }

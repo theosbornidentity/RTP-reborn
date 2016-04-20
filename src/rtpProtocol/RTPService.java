@@ -8,7 +8,11 @@ import util.*;
 
 public class RTPService {
 
-  private DatagramSocket socket;
+  private boolean logging;
+  private Printer p;
+
+  // private DatagramSocket socket;
+  private Mailman mailman;
   private PacketFactory factory;
   private int recvWindow;
 
@@ -23,10 +27,15 @@ public class RTPService {
   private HashMap<Integer, RTPPacket> receivedPackets;
   private boolean getComplete;
 
-  public RTPService (DatagramSocket socket, PacketFactory factory) {
-    this.socket = socket;
+//  public RTPService (DatagramSocket socket, PacketFactory factory, boolean logging) {
+  public RTPService (Mailman mailman, PacketFactory factory, boolean logging) {
+  //  this.socket = socket;
+    this.mailman = mailman;
     this.factory = factory;
     this.recvWindow = factory.getRecvWindow();
+
+    this.logging = logging;
+    this.p = new Printer(logging);
   }
 
   //============================================================================
@@ -59,7 +68,7 @@ public class RTPService {
 
       if(noRecentUpdate) {
         getComplete = true;
-        Print.statusLn("GET completed.");
+        p.logStatus("GET complete");
         return;
       }
     }
@@ -71,14 +80,14 @@ public class RTPService {
     int key = data.getSeqNum();
     receivedPackets.put(key, data);
     recvDataBytes += data.getDataSize();
-    Print.recv("\tReceived packet " + key + ".");
-    Print.infoLn("\tTotal bytes received: " + recvDataBytes);
+    p.logReceive("received DATA packet " + key, recvDataBytes);
   }
 
   private void sendAck(RTPPacket data) {
     RTPPacket ack = factory.createACK(data);
-    RTPUtil.sendPacket(socket, ack);
-    //Print.sendLn("\tSent ACK " + ack.getAckNum());
+    //RTPUtil.sendPacket(socket, ack);
+    mailman.send(ack);
+    p.logSend("sent ACK ", ack.getAckNum());
   }
 
   public boolean isGetComplete () {
@@ -113,7 +122,7 @@ public class RTPService {
     for(RTPPacket p : dataPackets)
       toReturn.put(p.getSeqNum(), p);
 
-    Print.statusLn("\tPackets to send: " + toReturn.size());
+    p.logStatus("packets to send: " + toReturn.size());
     return toReturn;
   }
 
@@ -121,31 +130,32 @@ public class RTPService {
     Object[] packetList = packetsToSend.values().toArray();
     for(Object p : packetList)
       sendPacket((RTPPacket) p, false);
-    while(!postComplete)
+    while(!postComplete) {
       postComplete = resendUnacked();
-    Print.statusLn("File POST successful.");
+    }
+    p.logStatus("file POST successful");
   }
 
 
-  private void sendPacket(RTPPacket p, boolean isResend) {
+  private void sendPacket(RTPPacket packet, boolean isResend) {
     for(;;) {
       int bytesOut;
-      if(!isResend) bytesOut = unackedBytes + p.getSize();
+      if(!isResend) bytesOut = unackedBytes + packet.getSize();
       else bytesOut = unackedBytes;
       boolean recvWindowFull = (bytesOut > recvWindow);
 
       if(!recvWindowFull) {
-        RTPUtil.sendPacket(socket, p);
+        //RTPUtil.sendPacket(socket, p);
+        mailman.send(packet);
         if(!isResend) {
-          sentPackets.put(p.getSeqNum(), p);
-          unackedBytes += p.getSize();
+          sentPackets.put(packet.getSeqNum(), packet);
+          unackedBytes += packet.getSize();
         }
-        Print.send("\tSent packet " + p.getSeqNum() + ".");
-        Print.infoLn("\tUnacked bytes: " + unackedBytes);
+        p.logSend("sent packet " + packet.getSeqNum(), unackedBytes);
         return;
       }
       else {
-        Print.infoLn("\tReceiver window full.");
+        p.logInfo("receiver window full");
         if(!isResend) resendUnacked();
         RTPUtil.stall();
       }
@@ -153,6 +163,8 @@ public class RTPService {
   }
 
   private boolean resendUnacked() {
+    RTPUtil.stall();
+
     boolean allAcked = true;
     Object[] packetList = sentPackets.values().toArray();
     for(Object p: packetList) {
@@ -167,7 +179,6 @@ public class RTPService {
   }
 
   public void handleAck (RTPPacket ack) {
-
     int seqNum = ack.getAckNum();
     RTPPacket ackedPacket = packetsToSend.get(seqNum);
 
@@ -175,7 +186,7 @@ public class RTPService {
     if(acked.get(seqNum) != null) isDuplicate = true;
 
     if(!isDuplicate) {
-      //Print.recvLn("\tAck received " + seqNum);
+      p.logReceive("ACK received " + seqNum);
       acked.put(seqNum, true);
       unackedBytes -= ackedPacket.getSize();
     }
@@ -185,16 +196,3 @@ public class RTPService {
     return postComplete;
   }
 }
-
-// private RTPPacket getNextPacket (int seqNum) {
-//   int timer = 0;
-//   for (;;) {
-//     if(timer > 50) getComplete = true;
-//     boolean received = receivedPackets.containsKey(seqNum);
-//     if(received) return receivedPackets.get(seqNum);
-//     else {
-//       RTPUtil.stall();
-//       timer++;
-//     }
-//   }
-// }

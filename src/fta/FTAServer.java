@@ -9,14 +9,20 @@ public class FTAServer {
 
   private static RTPServer server;
 
-  public static void run (Scanner scanner) {
-    Print.promptLn("Running RTPServer...\n");
+  private static boolean corrupted;
+  private static boolean logging;
+
+  public static void run (Scanner scanner, boolean c, boolean l) {
+    corrupted = c;
+    logging = l;
+
+    Printer.promptLn("Running RTPServer...\n");
     scanner.nextLine();
     startServerPrompt(scanner);
   }
 
   public static void startServerPrompt(Scanner scanner) {
-    Print.promptLn("Please start the server:\n" +
+    Printer.promptLn("Please start the server:\n" +
                    "\tfta-server [Port Number] [Window Size in Bytes >= 1000]\n");
     String command = scanner.nextLine();
     String[] args = command.split(" ");
@@ -29,22 +35,24 @@ public class FTAServer {
       return;
     }
     else {
-      Print.errorLn("Invalid command.");
+      Printer.errorLn("Invalid command.");
     }
 
     startServerPrompt(scanner);
   }
 
   public static void start(int sPort, int window) {
-    Print.promptLn("Starting server...\n" +
+    Printer.promptLn("Starting server...\n" +
                    "\tIP: " + RTPUtil.getIPAddress() + "\n" +
                    "\tPort: " + sPort + "\n" +
                    "\tWindow Size: " + window + "\n");
 
-    Print.infoLn("In order for server to correctly verify incoming data transfers, \n" +
-                  "you must update FILETOVERIFY in RTPServer.java with the correct filename.");
+    Printer.infoLn("In order for server to correctly verify incoming data transfers, \n" +
+                  "you must update FILETOVERIFY in RTPServer.java with the correct filename.\n");
 
     server = new RTPServer(sPort, window);
+    server.setLogging(logging);
+    server.setCorrupted(corrupted);
     server.start();
   }
 }

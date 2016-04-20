@@ -184,7 +184,7 @@ public class RTPHeader {
   */
 
   public void buildFromBytes(byte[] packet) {
-    //Print.errorLn("header bytes: " + packet.length);
+    //Printer.errorLn("header bytes: " + packet.length);
 
     if(packet.length == 0)
       return;
@@ -213,7 +213,7 @@ public class RTPHeader {
       buff.get(bytes);
       this.dIP = new String(bytes);
    } catch (BufferOverflowException e) {
-       Print.errorLn("------------header size corrupted, disposing---------------");
+       Printer.errorLn("------------header size corrupted, disposing---------------");
    }
   }
 

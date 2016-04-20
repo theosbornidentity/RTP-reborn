@@ -7,11 +7,16 @@ import util.*;
 
 public class RTPClient {
 
+  private Printer p;
+  private boolean corruption;
+  private boolean logging;
+
   private String sIP, dIP;
   private int sPort, dPort;
   private int window;
 
-  private DatagramSocket socket;
+  //private DatagramSocket socket;
+  private Mailman mailman;
 
   private PacketBuffer buffer;
 
@@ -30,6 +35,9 @@ public class RTPClient {
     this.window = window;
 
     this.buffer = new PacketBuffer();
+
+    mailman = new Mailman(sPort, sIP);
+    p = new Printer(false);
   }
 
   //============================================================================
@@ -37,14 +45,15 @@ public class RTPClient {
   //============================================================================
 
   public void start () {
-    socket = RTPUtil.openSocket(sPort, sIP);
+    //socket = RTPUtil.openSocket(sPort, sIP);
     receivePackets();
   }
 
   private void receivePackets () {
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
-        RTPPacket in = RTPUtil.recvPacket(socket);
+        //RTPPacket in = RTPUtil.recvPacket(socket);
+        RTPPacket in = mailman.receive();
         buffer.put(in);
       }
     }}).start();
@@ -52,12 +61,13 @@ public class RTPClient {
 
   public void disconnect () {
     if(!this.connected) {
-      Print.errorLn("Client not yet connected.");
+      p.logError("client not yet connected");
       return;
     }
     sendFIN();
-    Print.successLn("Closing socket.");
-    socket.close();
+    //socket.close();
+    mailman.fire();
+
     System.exit(0);
   }
 
@@ -74,8 +84,9 @@ public class RTPClient {
     int recvWindow = synack.getWindowSize();
     factory.setRecvWindow(recvWindow);
 
-    Print.statusLn("Connected to server at " + this.dIP + ":" + this.dPort +
-                   "\n\tWindow size " + recvWindow + "\n");
+    p.logStatus("connected to server at " + this.dIP + ":" + this.dPort +
+              " with window size " + recvWindow);
+
     return true;
   }
 
@@ -83,17 +94,20 @@ public class RTPClient {
     RTPPacket syn = factory.createSYN(dPort, dIP);
 
     for(;;) {
-      RTPUtil.sendPacket(socket, syn);
-      Print.sendLn("\tSent SYN Packet");
+      //RTPUtil.sendPacket(socket, syn, corruption);
+
+      mailman.send(syn);
+      p.logSend("sent SYN packet");
 
       RTPUtil.stall();
 
       if(buffer.hasSYNACK()) {
-        Print.recvLn("\tReceived SYNACK Packet\n");
-        return buffer.getSYNACK();
+        RTPPacket synack = buffer.getSYNACK();
+        p.logReceive("received SYNACK packet");
+        return synack;
       }
 
-      Print.infoLn("\tNo response to SYN... resending\n");
+      p.logInfo("no response to SYN... resending");
     }
   }
 
@@ -140,24 +154,26 @@ public class RTPClient {
   //============================================================================
 
   private RTPService createConnectionService () {
-    return new RTPService (socket, factory);
+    return new RTPService (mailman, factory, logging);
+    //return new RTPService (socket, factory);
   }
 
   private void sendGet (String filename) {
     RTPPacket get = factory.createGET(filename.getBytes());
 
     for(;;) {
-      RTPUtil.sendPacket(socket, get);
-      Print.sendLn("\tSent GET Packet for " + filename);
+    //  RTPUtil.sendPacket(socket, get, corruption);
+      mailman.send(get);
+      p.logSend("sent GET packet for " + filename, get.getSeqNum());
 
       RTPUtil.stall();
 
       if(buffer.hasDATA()) {
-        Print.statusLn("\tIncoming data...\n");
+        p.logStatus("incoming data");
         return;
       }
 
-      Print.infoLn("\tNo response to GET... resending\n");
+      p.logInfo("no response to GET... resending");
     }
   }
 
@@ -178,7 +194,7 @@ public class RTPClient {
   }
 
   private void endGet (String filename) {
-    Print.statusLn("GET process completed for " + filename);
+    p.logStatus("GET process completed for " + filename);
     byte[] data = getProcess.getData();
     getProcess = null;
     RTPUtil.createGETFile(filename, data);
@@ -196,7 +212,7 @@ public class RTPClient {
   }
 
   private void listenForAck () {
-    Print.statusLn("\tAccepting ACKS...");
+    p.logStatus("accepting ACKs");
 
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
@@ -215,7 +231,7 @@ public class RTPClient {
   }
 
   private void endPOST () {
-    Print.statusLn("POST process completed");
+    p.logStatus("POST process completed");
     postProcess = null;
     postComplete = true;
   }
@@ -228,17 +244,35 @@ public class RTPClient {
     RTPPacket fin = factory.createFinPacket();
 
     for(;;) {
-      RTPUtil.sendPacket(socket, fin);
-      Print.sendLn("\tSent FIN Packet");
+    //  RTPUtil.sendPacket(socket, fin, corruption);
+      mailman.send(fin);
+      p.logSend("sent FIN packet");
 
       RTPUtil.stall();
 
       if(buffer.hasFINACK()) {
-        Print.recvLn("\tReceived FINACK Packet\n");
+        p.logReceive("received FINACK packet");
         return;
       }
 
-      Print.infoLn("\tNo response to FIN... resending\n");
+      p.logInfo("no response to FIN... resending");
     }
   }
+
+
+  //============================================================================
+  // Testing methods
+  //============================================================================
+
+  public void setLogging(boolean l) {
+    this.p = new Printer(l);
+    this.logging = l;
+    this.mailman.setLogging(l);
+  }
+
+  public void setCorrupted(boolean c) {
+    this.corruption = c;
+    this.mailman.setCorrupted(c);
+  }
+
 }
