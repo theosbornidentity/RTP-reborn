@@ -223,6 +223,7 @@ public class RTPClient {
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
         if(buffer.hasDATAFIN()) {
+          sendDataFinAck(buffer.getDATAFIN());
           endGet(filename);
           return;
         }
@@ -233,6 +234,28 @@ public class RTPClient {
           stall();
       }
     }}).start();
+  }
+
+  private void sendDataFinAck (RTPPacket datafin) {
+    RTPPacket datafinack = factory.createACK(datafin);
+
+    for(;;) {
+      p.logStatus("updating server with get completed status");
+      mailman.send(datafinack);
+      long sendTime = System.currentTimeMillis();
+
+      stall();
+
+      while(!buffer.hasDATAFIN()) {
+        boolean secondsPassed = (System.currentTimeMillis() - sendTime > 2000);
+        if (secondsPassed) return;
+        stall();
+      }
+
+      buffer.getDATAFIN();
+
+      p.logInfo("no response to completion status... resending");
+    }
   }
 
   private void endGet (String filename) {
@@ -256,11 +279,7 @@ public class RTPClient {
   private void listenForAck () {
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
-        if(postProcess.isPostComplete()) {
-          endPOST();
-          return;
-        }
-        else if(buffer.hasACK()) {
+        if(buffer.hasACK()) {
           RTPPacket ack = buffer.getACK();
           postProcess.handleAck(ack);
         }
@@ -270,10 +289,6 @@ public class RTPClient {
     }}).start();
   }
 
-  private void endPOST () {
-    postProcess = null;
-    postComplete = true;
-  }
 
   //============================================================================
   // Methods for disconnecting from server

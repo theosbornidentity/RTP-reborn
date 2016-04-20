@@ -2,16 +2,19 @@
 
     <property name="src.dir"     value="src"/>
     <property name="build.dir"   value="build"/>
+    <property name="output.dir"   value="${src.dir}/fta/output"/>
     <property name="classes.dir" value="${build.dir}/classes"/>
     <property name="jar.dir"     value="${build.dir}/jar"/>
     <property name="main-class"  value="Main"/>
 
     <target name="clean">
         <delete dir="${build.dir}"/>
+        <delete dir="${output.dir}"/>
     </target>
 
     <target name="compile">
         <mkdir dir="${classes.dir}"/>
+        <mkdir dir="${output.dir}"/>
         <javac srcdir="${src.dir}" destdir="${classes.dir}"/>
     </target>
 

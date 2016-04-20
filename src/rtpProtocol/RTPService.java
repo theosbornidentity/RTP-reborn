@@ -165,14 +165,29 @@ public class RTPService {
     if(!isDuplicate) {
       p.logReceive("ACK received " + seqNum);
       acked.put(seqNum, true);
-      unackedBytes -= ackedPacket.getSize();
+      if(ackedPacket != null)
+        unackedBytes -= ackedPacket.getSize();
     }
   }
 
   public void sendDataFin() {
     RTPPacket datafin = factory.createDATAFIN();
-    p.logSend("sending DATAFIN packet", datafin.getSeqNum());
-    sendPacket(datafin, false);
+
+    for(;;) {
+      p.logSend("sending DATAFIN packet", datafin.getSeqNum());
+      mailman.send(datafin);
+
+      stall();
+
+      if(acked.get(datafin.getSeqNum()) != null) {
+        p.logStatus("received DATAFIN confirmation");
+        postComplete = true;
+        return;
+      }
+
+      p.logInfo("no response to DATAFIN... resending");
+    }
+
   }
 
   public boolean isPostComplete() {

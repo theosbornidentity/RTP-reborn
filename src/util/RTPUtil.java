@@ -119,7 +119,7 @@ public class RTPUtil {
 
   public static void createGETFile(byte[] data) {
     try {
-      Path path = Paths.get("src/fta/get_F.jpg");
+      Path path = Paths.get("src/fta/output/get_F.jpg");
       Files.write(path, data);
     }
     catch (IOException e) {
@@ -130,7 +130,7 @@ public class RTPUtil {
 
   public static void createPOSTFile(byte[] data) {
     try {
-      Path path = Paths.get("src/fta/post_G.jpg");
+      Path path = Paths.get("src/fta/output/post_G.jpg");
       Files.write(path, data);
     }
     catch (IOException e) {

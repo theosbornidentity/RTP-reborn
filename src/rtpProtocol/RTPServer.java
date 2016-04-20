@@ -193,7 +193,6 @@ public class RTPServer {
           posts.remove(key);
           return get;
         }
-
       }
     }
   }
@@ -248,7 +247,32 @@ public class RTPServer {
   private void handleDataFin () {
     RTPPacket datafin = buffer.getDATAFIN();
     String key = datafin.hash();
-    if(openProcess(key)) endGet(key);
+    if(openProcess(key)) {
+      sendDataFinAck(key, datafin);
+      endGet(key);
+    }
+  }
+
+  private void sendDataFinAck (String key, RTPPacket datafin) {
+    RTPPacket datafinack = factories.get(key).createACK(datafin);
+
+    for(;;) {
+      p.logStatus("updating client with GET completed status");
+      mailman.send(datafinack);
+      long sendTime = System.currentTimeMillis();
+
+      RTPUtil.stall();
+
+      while(!buffer.hasDATAFIN()) {
+        boolean secondsPassed = (System.currentTimeMillis() - sendTime > 2000);
+        if (secondsPassed) return;
+        RTPUtil.stall();
+      }
+
+      buffer.getDATAFIN();
+
+      p.logInfo("no response to completion status... resending");
+    }
   }
 
   private boolean openProcess (String key) {
