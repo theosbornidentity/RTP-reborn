@@ -15,6 +15,8 @@ import util.*;
 
 public class RTPUtil {
 
+  public static Printer p = new Printer(true);
+
   public static String getIPAddress() {
     try {
       return InetAddress.getLocalHost().getHostAddress();
@@ -117,10 +119,21 @@ public class RTPUtil {
     }
   }
 
+  public static byte[] getFileBytes(String filename, String pathway) {
+    try {
+      Path path = Paths.get(pathway + filename);
+      return Files.readAllBytes(path);
+    } catch (IOException e) {
+      Printer.errorLn("Could not find file.");
+      return null;
+    }
+  }
+
   public static void createGETFile(byte[] data) {
     try {
       Path path = Paths.get("src/fta/output/get_F.jpg");
       Files.write(path, data);
+      p.logStatus("created file at src/fta/output/get_F.jpg");
     }
     catch (IOException e) {
       Printer.errorLn("Could not create file.");
@@ -132,6 +145,7 @@ public class RTPUtil {
     try {
       Path path = Paths.get("src/fta/output/post_G.jpg");
       Files.write(path, data);
+      p.logStatus("created file at src/fta/output/post_G.jpg");
     }
     catch (IOException e) {
       Printer.errorLn("Could not create file.");

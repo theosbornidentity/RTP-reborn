@@ -23,7 +23,7 @@ public class FTAServer {
 
   public static void startServerPrompt(Scanner scanner) {
     Printer.promptLn("Please start the server:\n" +
-                   "\tfta-server [Port Number] [Window Size in Bytes >= 1000]\n");
+                   "\tfta-server <Port Number> <Window Size in Bytes >= 1000>\n");
     String command = scanner.nextLine();
     String[] args = command.split(" ");
     boolean validCommand = (args.length == 3) &&
@@ -51,6 +51,6 @@ public class FTAServer {
     server = new RTPServer(sPort, window);
     server.setLogging(logging);
     server.setCorrupted(corrupted);
-    return server.start();
+    return server.start("src/fta/");
   }
 }

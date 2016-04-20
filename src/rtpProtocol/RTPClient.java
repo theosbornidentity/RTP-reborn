@@ -8,12 +8,10 @@ import util.*;
 public class RTPClient {
 
   private Printer p;
-  private boolean corruption;
-  private boolean logging;
+  private boolean corruption, logging;
 
   private String sIP, dIP;
-  private int sPort, dPort;
-  private int window;
+  private int sPort, dPort, window;
 
   //private DatagramSocket socket;
   private Mailman mailman;
@@ -21,8 +19,9 @@ public class RTPClient {
   private PacketBuffer buffer;
 
   private PacketFactory factory;
-  private RTPService getProcess;
-  private RTPService postProcess;
+
+  private RTPService getProcess, postProcess;
+  private byte[] getData;
 
   private boolean connected, getComplete, postComplete;
 
@@ -66,9 +65,9 @@ public class RTPClient {
       return;
     }
     sendFIN();
+    connected = false;
     p.logError("firing mailman and ending connection");
     mailman.fire();
-    System.exit(0);
   }
 
   //============================================================================
@@ -152,13 +151,13 @@ public class RTPClient {
   // Data get methods
   //============================================================================
 
-  public void get (String filename) {
+  public byte[] get (String filename) {
     getComplete = false;
     buffer = new PacketBuffer();
 
     if(!this.connected) {
       p.logError("not yet connected to server");
-      return;
+      return null;
     }
 
     getProcess = createConnectionService();
@@ -167,16 +166,21 @@ public class RTPClient {
     boolean receiving = sendGet(filename);
     if(receiving) processIncomingData(filename);
     else p.logError(filename + " does not exist at server");
+
+    while(!getComplete) { stall(); }
+
+    return this.getData;
+
   }
 
-  public void getPost (String getFilename, String postFilename) {
+  public byte[] getPost (String getFilename, String postFilename) {
     getComplete = false;
     postComplete = false;
     buffer = new PacketBuffer();
 
     if(!this.connected) {
       p.logError("not yet connected to server");
-      return;
+      return null;
     }
 
     getProcess = createConnectionService();
@@ -189,6 +193,10 @@ public class RTPClient {
     boolean receiving = sendGet(getFilename);
     if(receiving) processIncomingData(getFilename);
     else p.logError(getFilename + " does not exist at server");
+
+    while(!getComplete && !postComplete) { stall(); }
+
+    return this.getData;
   }
 
   //============================================================================
@@ -260,9 +268,10 @@ public class RTPClient {
 
   private void endGet (String filename) {
     p.logStatus("GET process completed for " + filename);
-    byte[] data = getProcess.getData();
+    this.getData = getProcess.getData();
+    //byte[] data = getProcess.getData();
     getProcess = null;
-    RTPUtil.createGETFile(data);
+    //RTPUtil.createGETFile(data);
     getComplete = true;
   }
 
@@ -294,7 +303,7 @@ public class RTPClient {
   // Methods for disconnecting from server
   //============================================================================
 
-  private void sendFIN () {
+  private boolean sendFIN () {
     RTPPacket fin = factory.createFIN();
 
     for(;;) {
@@ -306,7 +315,7 @@ public class RTPClient {
       if(buffer.hasFINACK()) {
         p.logStatus("received confirmation of termination request");
         sendEND();
-        return;
+        return true;
       }
 
       p.logInfo("no response to FIN... resending");
@@ -325,7 +334,10 @@ public class RTPClient {
 
       while(!buffer.hasFINACK()) {
         boolean secondsPassed = (System.currentTimeMillis() - endSendTime > 2000);
-        if (secondsPassed) return true;
+        if (secondsPassed) {
+          postComplete = true;
+          return true;
+        }
         stall();
       }
 

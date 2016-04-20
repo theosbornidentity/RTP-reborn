@@ -23,9 +23,11 @@ public class Mailman {
   private final int MAX_DELAY = 50;
 
   private DatagramSocket socket;
+  //private boolean open;
 
   public Mailman (int sPort, String sIP) {
     this.socket = RTPUtil.openSocket(sPort, sIP);
+  //  this.open = true;
     this.p = new Printer(false);
   }
 
@@ -152,7 +154,6 @@ public class Mailman {
       }
     }
     catch (IOException e) {
-      e.printStackTrace();
       System.exit(0);
     }
     return null;

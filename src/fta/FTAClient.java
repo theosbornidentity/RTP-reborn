@@ -24,8 +24,8 @@ public class FTAClient {
     startClientPrompt(scanner);
 
     Printer.promptLn("\nAccepted client commands:");
-    Printer.promptLn("\tget [filename]\n" +
-                   "\tget-post [get filname] [post filename]\n" +
+    Printer.promptLn("\tget <filename>\n" +
+                   "\tget-post <get filname> <post filename>\n" +
                    "\tdisconnect\n");
 
     startClientCommandsPrompt(scanner);
@@ -33,7 +33,7 @@ public class FTAClient {
 
   public static void startClientPrompt (Scanner scanner) {
     Printer.promptLn("\nPlease start the client:");
-    Printer.promptLn("\tfta-client [Server IP Address]:[Server Port Number] [Window Size in Bytes >= 1000]\n");
+    Printer.promptLn("\tfta-client <Server IP Address>:<Server Port Number> <Window Size in Bytes >= 1000>\n");
 
     String command = scanner.nextLine();
     String[] args = command.split(" ");
@@ -111,12 +111,14 @@ public class FTAClient {
 
   public static void get (String getFile) {
     Printer.promptLn("Downloading file " + getFile + "...\n");
-    client.get(getFile);
+    byte[] data = client.get(getFile);
+    RTPUtil.createGETFile(data);
   }
 
   public static void getPost (String getFile, String postFile) {
     Printer.promptLn("Downloading file " + getFile + " and uploading file " + postFile + "...\n");
-    client.getPost(getFile, postFile);
+    byte[] data = client.getPost(getFile, postFile);
+    RTPUtil.createGETFile(data);
   }
 
   public static void disconnect () {

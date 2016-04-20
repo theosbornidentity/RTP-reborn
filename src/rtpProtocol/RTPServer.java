@@ -10,19 +10,17 @@ public class RTPServer {
 
   private Printer p;
 
-  private boolean corruption;
-  private boolean logging;
+  private boolean corruption, logging;
 
   private Mailman mailman;
 
-  private String sIP;
+  private String sIP, pathway;
   private int sPort, window;
 
   private PacketBuffer buffer;
 
   private HashMap<String, PacketFactory> factories;
-  private HashMap<String, RTPService> posts;
-  private HashMap<String, RTPService> gets;
+  private HashMap<String, RTPService> posts, gets;
 
   private boolean running;
 
@@ -42,11 +40,12 @@ public class RTPServer {
   // Start Server Methods
   //============================================================================
 
-  public boolean start () {
+  public boolean start (String pathway) {
     if(running) {
       Printer.errorLn("Server is already running.");
       return false;
     }
+    this.pathway = pathway;
 
     running = true;
     buffer = new PacketBuffer();
@@ -55,11 +54,7 @@ public class RTPServer {
 
     RTPUtil.stall();
 
-    //acceptConnections();
-    //listenForGet();
     listenForData();
-    //listenForAck();
-    //listenForFin();
 
     return true;
   }
@@ -160,16 +155,17 @@ public class RTPServer {
         String filename = new String(get.getData());
         p.logStatus("received a GET request for " + filename);
 
+
         if(RTPUtil.filesExist(filename)) {
           RTPService postProcess = new RTPService(mailman, factories.get(key), logging);
 
           posts.put(key, postProcess);
 
-          byte[] data = RTPUtil.getFileBytes(filename);
+          byte[] data = RTPUtil.getFileBytes(filename, pathway);
           posts.get(key).startPost(data, filename);
         }
         else {
-          p.logError("requested file " + filename + " does not exist");
+          p.logError("requested file " + filename + " does not exist at " + pathway);
         }
 
       //}
