@@ -76,16 +76,20 @@ public class PacketFactory {
     return toReturn;
   }
 
+  public RTPPacket createDATAFIN () {
+    return createPacket(State.DATAFIN);
+  }
+
   public RTPPacket createACK (RTPPacket in) {
     this.ackNum = in.getSeqNum();
     return createACK(State.ACK);
   }
 
-  public RTPPacket createFinPacket () {
+  public RTPPacket createFIN () {
     return createPacket(State.FIN);
   }
 
-  public RTPPacket createFinAckPacket (RTPPacket fin) {
+  public RTPPacket createFINACK (RTPPacket fin) {
     this.ackNum = fin.getSeqNum();
     return createACK(State.FINACK);
   }

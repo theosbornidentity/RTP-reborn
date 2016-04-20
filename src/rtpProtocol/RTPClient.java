@@ -154,6 +154,7 @@ public class RTPClient {
 
   public void get (String filename) {
     getComplete = false;
+    buffer = new PacketBuffer();
 
     if(!this.connected) {
       p.logError("not yet connected to server");
@@ -172,6 +173,7 @@ public class RTPClient {
   public void getPost (String getFilename, String postFilename) {
     getComplete = false;
     postComplete = false;
+    buffer = new PacketBuffer();
 
     if(!this.connected) {
       p.logError("not yet connected to server");
@@ -219,7 +221,7 @@ public class RTPClient {
   private void processIncomingData (String filename) {
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
-        if(getProcess.isGetComplete()) {
+        if(buffer.hasDATAFIN()) {
           endGet(filename);
           return;
         }
@@ -280,10 +282,9 @@ public class RTPClient {
   //============================================================================
 
   private void sendFIN () {
-    RTPPacket fin = factory.createFinPacket();
+    RTPPacket fin = factory.createFIN();
 
     for(;;) {
-    //  RTPUtil.sendPacket(socket, fin, corruption);
       mailman.send(fin);
       p.logSend("sent FIN packet");
 

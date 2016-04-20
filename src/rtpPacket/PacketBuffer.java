@@ -17,6 +17,7 @@ public class PacketBuffer {
     this.queues.add(State.SYNFIN.ordinal(), new ArrayList<RTPPacket>());
     this.queues.add(State.GET.ordinal(), new ArrayList<RTPPacket>());
     this.queues.add(State.DATA.ordinal(), new ArrayList<RTPPacket>());
+    this.queues.add(State.DATAFIN.ordinal(), new ArrayList<RTPPacket>());
     this.queues.add(State.ACK.ordinal(), new ArrayList<RTPPacket>());
     this.queues.add(State.FIN.ordinal(), new ArrayList<RTPPacket>());
     this.queues.add(State.FINACK.ordinal(), new ArrayList<RTPPacket>());
@@ -32,6 +33,7 @@ public class PacketBuffer {
     else if (in.isType(State.SYNFIN))  safePut(State.SYNFIN, in);
     else if (in.isType(State.GET))     safePut(State.GET, in);
     else if (in.isType(State.DATA))    safePut(State.DATA, in);
+    else if (in.isType(State.DATAFIN)) safePut(State.DATAFIN, in);
     else if (in.isType(State.ACK))     safePut(State.ACK, in);
     else if (in.isType(State.FIN))     safePut(State.FIN, in);
     else if (in.isType(State.FINACK))  safePut(State.FINACK, in);
@@ -69,6 +71,10 @@ public class PacketBuffer {
     return !queues.get(State.DATA.ordinal()).isEmpty();
   }
 
+  public boolean hasDATAFIN() {
+    return !queues.get(State.DATAFIN.ordinal()).isEmpty();
+  }
+
   public boolean hasACK() {
     return !queues.get(State.ACK.ordinal()).isEmpty();
   }
@@ -103,6 +109,10 @@ public class PacketBuffer {
 
   public RTPPacket getDATA() {
     return safeGet(State.DATA);
+  }
+
+  public RTPPacket getDATAFIN() {
+    return safeGet(State.DATAFIN);
   }
 
   public RTPPacket getACK() {

@@ -11,7 +11,6 @@ public class RTPService {
   private boolean logging;
   private Printer p;
 
-  // private DatagramSocket socket;
   private Mailman mailman;
   private PacketFactory factory;
   private int recvWindow;
@@ -44,32 +43,13 @@ public class RTPService {
     getComplete = false;
     lastRecvTime = System.currentTimeMillis();
     this.receivedPackets = new HashMap<Integer, RTPPacket>();
-
-    new Thread(new Runnable() {@Override public void run() {
-      updateGetStatus();
-    }}).start();
   }
 
   public boolean handleData (RTPPacket data) {
-    if(getComplete) return true;
     Boolean notReceived = !receivedPackets.containsKey(data.getSeqNum());
     if(notReceived) bufferData(data);
     sendAck(data);
     return false;
-  }
-
-  private void updateGetStatus () {
-    for(;;) {
-      stall();
-
-      boolean noRecentUpdate = (System.currentTimeMillis() - lastRecvTime) > 5000;
-
-      if(noRecentUpdate) {
-        getComplete = true;
-        p.logStatus("GET complete");
-        return;
-      }
-    }
   }
 
   private void bufferData (RTPPacket data) {
@@ -130,9 +110,8 @@ public class RTPService {
     while(!postComplete) {
       postComplete = resendUnacked();
     }
-    p.logStatus("file POST successful");
+    sendDataFin();
   }
-
 
   private void sendPacket(RTPPacket packet, boolean isResend) {
     for(;;) {
@@ -142,7 +121,6 @@ public class RTPService {
       boolean recvWindowFull = (bytesOut > recvWindow);
 
       if(!recvWindowFull) {
-        //RTPUtil.sendPacket(socket, p);
         mailman.send(packet);
         if(!isResend) {
           sentPackets.put(packet.getSeqNum(), packet);
@@ -187,6 +165,13 @@ public class RTPService {
       acked.put(seqNum, true);
       unackedBytes -= ackedPacket.getSize();
     }
+  }
+
+  public void sendDataFin() {
+    RTPPacket datafin = factory.createDATAFIN();
+    p.logSend("sending DATAFIN packet", datafin.getSeqNum());
+    sendPacket(datafin, false);
+    p.logStatus("POST completed");
   }
 
   public boolean isPostComplete() {

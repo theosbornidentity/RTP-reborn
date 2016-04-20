@@ -20,8 +20,6 @@ public class RTPServer {
   private String sIP;
   private int sPort, window;
 
-  //private DatagramSocket socket;
-
   private PacketBuffer buffer;
 
   private HashMap<String, PacketFactory> factories;
@@ -214,17 +212,12 @@ public class RTPServer {
   //============================================================================
 
   private void listenForData () {
-    //p.logStatus("accepting incoming DATA packets");
-
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
         if(buffer.hasDATA()) handleData();
+        else if(buffer.hasDATAFIN()) handleDataFin();
         else RTPUtil.stall();
       }
-    }}).start();
-
-    new Thread(new Runnable() {@Override public void run() {
-      listenForGetFinish();
     }}).start();
   }
 
@@ -235,6 +228,12 @@ public class RTPServer {
       sendToProcess(key, data);
     else
       createGetProcess(key, data);
+  }
+
+  private void handleDataFin () {
+    RTPPacket datafin = buffer.getDATAFIN();
+    String key = datafin.hash();
+    if(openProcess(key)) endGet(key);
   }
 
   private boolean openProcess (String key) {
@@ -257,24 +256,8 @@ public class RTPServer {
     gets.get(key).handleData(data);
   }
 
-  private void listenForGetFinish () {
-    new Thread(new Runnable() {@Override public void run() {
-      for(;;) {
-        Object[] keys = gets.keySet().toArray();
-        for(Object key : keys) {
-          boolean finished = gets.get(key.toString()).isGetComplete();
-          if(finished) {
-            endGet(key.toString());
-            return;
-          };
-        }
-        RTPUtil.stall();
-      }
-    }}).start();
-  }
-
   private void endGet(String key) {
-    p.logStatus("get process complete");
+    p.logStatus("GET process complete");
     byte[] data = gets.get(key).getData();
     RTPUtil.createPOSTFile(FILETOVERIFY, data);
     gets.remove(key);
@@ -316,7 +299,7 @@ public class RTPServer {
   }
 
   private void sendFINACK (RTPPacket fin, PacketFactory factory) {
-    RTPPacket finack = factory.createFinAckPacket(fin);
+    RTPPacket finack = factory.createFINACK(fin);
 
     for(int i = 0; i < 3; i++) {
       mailman.send(finack);
