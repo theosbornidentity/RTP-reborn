@@ -1,5 +1,5 @@
 package util;
 
 public enum State {
-  SYN, SYNACK, GET, DATA, ACK, FIN, FINACK
+  SYN, SYNACK, SYNFIN, GET, DATA, ACK, FIN, FINACK
 }

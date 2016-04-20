@@ -27,9 +27,7 @@ public class RTPService {
   private HashMap<Integer, RTPPacket> receivedPackets;
   private boolean getComplete;
 
-//  public RTPService (DatagramSocket socket, PacketFactory factory, boolean logging) {
   public RTPService (Mailman mailman, PacketFactory factory, boolean logging) {
-  //  this.socket = socket;
     this.mailman = mailman;
     this.factory = factory;
     this.recvWindow = factory.getRecvWindow();
@@ -62,7 +60,7 @@ public class RTPService {
 
   private void updateGetStatus () {
     for(;;) {
-      RTPUtil.stall();
+      stall();
 
       boolean noRecentUpdate = (System.currentTimeMillis() - lastRecvTime) > 5000;
 
@@ -85,7 +83,6 @@ public class RTPService {
 
   private void sendAck(RTPPacket data) {
     RTPPacket ack = factory.createACK(data);
-    //RTPUtil.sendPacket(socket, ack);
     mailman.send(ack);
     p.logSend("sent ACK ", ack.getAckNum());
   }
@@ -157,13 +154,13 @@ public class RTPService {
       else {
         p.logInfo("receiver window full");
         if(!isResend) resendUnacked();
-        RTPUtil.stall();
+        stall();
       }
     }
   }
 
   private boolean resendUnacked() {
-    RTPUtil.stall();
+    stall();
 
     boolean allAcked = true;
     Object[] packetList = sentPackets.values().toArray();
@@ -195,4 +192,7 @@ public class RTPService {
   public boolean isPostComplete() {
     return postComplete;
   }
+
+  public void stall() { RTPUtil.stall(factory.getRTT()); }
+
 }

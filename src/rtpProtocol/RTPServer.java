@@ -53,9 +53,6 @@ public class RTPServer {
     }
 
     running = true;
-
-  //  socket = RTPUtil.openSocket(sPort, sIP);
-
     buffer = new PacketBuffer();
 
     receivePackets();
@@ -86,13 +83,12 @@ public class RTPServer {
   //============================================================================
 
   private void acceptConnections () {
-    p.logStatus("accepting SYN requests");
 
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
         RTPPacket syn = newConnectionRequest();
 
-        p.logStatus("received new SYN packet");
+        p.logStatus("received a connection request");
         createConnection(syn);
 
         sendSYNACK(syn, factories.get(syn.hash()));
@@ -120,16 +116,32 @@ public class RTPServer {
   }
 
   private void sendSYNACK (RTPPacket syn, PacketFactory factory) {
-    RTPPacket synack = factories.get(syn.hash()).createSYNACK(syn);
+    String connection = syn.hash();
+    RTPPacket synack = factories.get(connection).createSYNACK(syn);
 
     for(;;) {
       mailman.send(synack);
       //RTPUtil.sendPacket(socket, synack);
-      p.logSend("sent SYNACK packet");
+      p.logStatus("sent connection confirmation");
 
       RTPUtil.stall();
 
-      if(factories.get(syn.hash()).isConnected()) return;
+      if(buffer.hasSYNFIN()) {
+        RTPPacket synfin = buffer.getSYNFIN();
+        String key = synfin.hash();
+        if(factories.containsKey(key)) {
+          factories.get(key).setConnected(true);
+          long RTT = RTPUtil.longFromByte(synfin.getData());
+          factories.get(key).setRTT(RTT);
+          float secRTT = (float) RTT/1000;
+          p.logStatus("received RTT probe of " + secRTT + " seconds");
+        }
+      }
+
+      if(factories.get(connection).isConnected()) {
+        p.logStatus("connected to client at " + connection);
+        return;
+      };
 
       p.logInfo("no response to SYNACK... resending");
     }
@@ -140,20 +152,17 @@ public class RTPServer {
   //============================================================================
 
   private void listenForGet () {
-    p.logStatus("accepting GET requests");
 
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
         RTPPacket get = newGetRequest();
 
         String key = get.hash();
-        factories.get(key).setConnected(true);
 
         String filename = new String(get.getData());
         p.logStatus("Received a new GET request for " + filename);
 
         RTPService postProcess = new RTPService(mailman, factories.get(key), logging);
-      //  RTPService postProcess = new RTPService(socket, factories.get(key), logging);
 
         posts.put(key, postProcess);
 
@@ -186,7 +195,7 @@ public class RTPServer {
   }
 
   private void listenForAck () {
-    p.logStatus("accepting ACKS");
+    //p.logStatus("accepting ACKS");
 
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
@@ -205,7 +214,7 @@ public class RTPServer {
   //============================================================================
 
   private void listenForData () {
-    p.logStatus("accepting incoming DATA packets");
+    //p.logStatus("accepting incoming DATA packets");
 
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
@@ -243,8 +252,6 @@ public class RTPServer {
     PacketFactory factory = factories.get(key);
     RTPService getProcess = new RTPService(mailman, factory, logging);
 
-    //RTPService getProcess = new RTPService(socket, factory, logging);
-
     gets.put(key, getProcess);
     gets.get(key).startGet();
     gets.get(key).handleData(data);
@@ -278,7 +285,7 @@ public class RTPServer {
   //============================================================================
 
   private void listenForFin () {
-      p.logStatus("accepting FIN requests");
+    //  p.logStatus("accepting FIN requests");
 
       for(;;) {
         RTPUtil.stall();
@@ -312,7 +319,6 @@ public class RTPServer {
     RTPPacket finack = factory.createFinAckPacket(fin);
 
     for(int i = 0; i < 3; i++) {
-      //RTPUtil.sendPacket(socket, finack);
       mailman.send(finack);
       p.logSend("sent FINACK packet");
     }

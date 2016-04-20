@@ -9,6 +9,7 @@ public class PacketFactory {
   private String sIP, dIP;
   private int sPort, dPort, window, recvWindow, seqNum, ackNum;
   private boolean connected;
+  private long RTT;
 
   public PacketFactory(int sPort, String sIP, int window) {
     this.sPort = sPort;
@@ -18,6 +19,8 @@ public class PacketFactory {
 
     this.seqNum = ThreadLocalRandom.current().nextInt(0, 10000);
     this.ackNum = 0;
+
+    this.RTT = 200;
   }
 
   public PacketFactory(int sPort, String sIP, int window, int recvWindow) {
@@ -28,23 +31,21 @@ public class PacketFactory {
 
     this.seqNum = ThreadLocalRandom.current().nextInt(0, 10000);
     this.ackNum = 0;
+
+    this.RTT = 200;
   }
 
-  public int getRecvWindow () {
-    return this.recvWindow;
-  }
+  public long getRTT() { return this.RTT; }
 
-  public void setRecvWindow (int recvWindow) {
-    this.recvWindow = recvWindow;
-  }
+  public void setRTT(long l) { this.RTT = (long) (l * 1.25); }
 
-  public boolean isConnected () {
-    return this.connected;
-  }
+  public int getRecvWindow () { return this.recvWindow; }
 
-  public void setConnected (boolean conn) {
-    this.connected = conn; 
-  }
+  public void setRecvWindow (int recvWindow) { this.recvWindow = recvWindow; }
+
+  public boolean isConnected () { return this.connected; }
+
+  public void setConnected (boolean conn) { this.connected = conn; }
 
   public RTPPacket createSYN (int dPort, String dIP) {
     this.dPort = dPort;
@@ -57,6 +58,10 @@ public class PacketFactory {
     this.dIP = syn.getSourceIP();
     this.ackNum = syn.getSeqNum();
     return createACK(State.SYNACK);
+  }
+
+  public RTPPacket createSYNFIN (long time) {
+    return createPacket(State.SYNFIN, RTPUtil.longToByte(time));
   }
 
   public RTPPacket createGET (byte[] filename) {

@@ -86,7 +86,7 @@ public class RTPUtil {
     }
   }
 
-  public static void stall(int t) {
+  public static void stall(long t) {
     try {
       Thread.sleep(t);
     } catch(InterruptedException e) {
@@ -165,4 +165,16 @@ public class RTPUtil {
     return toReturn;
   }
 
+  public static byte[] longToByte (long l) {
+    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+    buffer.putLong(l);
+    return buffer.array();
+  }
+
+  public static long longFromByte (byte[] b) {
+    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+    buffer.put(b);
+    buffer.flip();
+    return buffer.getLong();
+  }
 }
