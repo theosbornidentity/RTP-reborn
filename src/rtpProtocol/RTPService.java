@@ -116,6 +116,8 @@ public class RTPService {
   }
 
   private void sendPacket(RTPPacket packet, boolean isResend) {
+    int windowFull = 0;
+    int availableWindow = 0;
     for(;;) {
       int bytesOut;
       if(!isResend) bytesOut = unackedBytes + packet.getSize();
@@ -123,20 +125,48 @@ public class RTPService {
       boolean recvWindowFull = (bytesOut > recvWindow);
 
       if(!recvWindowFull) {
+        windowFull = 0;
+        availableWindow++;
         mailman.send(packet);
+
         if(!isResend) {
           sentPackets.put(packet.getSeqNum(), packet);
           unackedBytes += packet.getSize();
         }
+
+        if(availableWindow >= 2) {
+          availableWindow = 0;
+          decreaseRTT();
+        }
+
         p.logSend("sent packet " + packet.getSeqNum(), unackedBytes);
         return;
       }
+
       else {
+        windowFull++;
+
+        if(windowFull >= 2) {
+          windowFull = 0;
+          increaseRTT();
+        }
+
         p.logInfo("receiver window full");
         if(!isResend) resendUnacked();
-        stall();
       }
     }
+  }
+
+  private void increaseRTT() {
+    factory.setRTT(factory.getRTT() * 1.2);
+    float secRTT = (float) factory.getRTT()/1000;
+    p.logStatus("adjusted connection RTT delay to " + secRTT);
+  }
+
+  private void decreaseRTT() {
+    factory.setRTT(factory.getRTT() * .8);
+    float secRTT = (float) factory.getRTT()/1000;
+    p.logStatus("adjusted connection RTT delay to " + secRTT);
   }
 
   private boolean resendUnacked() {

@@ -13,7 +13,6 @@ public class RTPClient {
   private String sIP, dIP;
   private int sPort, dPort, window;
 
-  //private DatagramSocket socket;
   private Mailman mailman;
 
   private PacketBuffer buffer;
@@ -63,6 +62,7 @@ public class RTPClient {
     if(!this.connected) {
       p.logError("client not yet connected");
       return;
+
     }
     sendFIN();
     connected = false;
@@ -124,13 +124,13 @@ public class RTPClient {
     long RTT = System.currentTimeMillis() - startTime;
 
     RTPPacket synfin = factory.createSYNFIN(RTT);
-    factory.setRTT(RTT);
+    factory.setRTT(RTT * 1.2);
 
     for(;;) {
       mailman.send(synfin);
       long synfinSendTime = System.currentTimeMillis();
 
-      float secRTT = (float) RTT/1000;
+      float secRTT = (float) (RTT*1.2)/1000;
       p.logStatus("sending server RTT probe of " + secRTT + " seconds");
 
       stall();
@@ -238,8 +238,8 @@ public class RTPClient {
         else if(buffer.hasDATA()){
           getProcess.handleData(buffer.getDATA());
         }
-        else
-          stall();
+        else RTPUtil.delay();
+        //   RTPUtil.stall();
       }
     }}).start();
   }
@@ -269,9 +269,7 @@ public class RTPClient {
   private void endGet (String filename) {
     p.logStatus("GET process completed for " + filename);
     this.getData = getProcess.getData();
-    //byte[] data = getProcess.getData();
     getProcess = null;
-    //RTPUtil.createGETFile(data);
     getComplete = true;
   }
 
@@ -292,8 +290,8 @@ public class RTPClient {
           RTPPacket ack = buffer.getACK();
           postProcess.handleAck(ack);
         }
-        else
-          stall();
+        else RTPUtil.delay();
+          //stall();
       }
     }}).start();
   }

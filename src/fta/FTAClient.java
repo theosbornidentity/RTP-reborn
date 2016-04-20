@@ -88,7 +88,7 @@ public class FTAClient {
   public static boolean filesExist (String... files) {
     try {
       for(String filename: files) {
-        Path path = Paths.get("src/fta/" + filename);
+        Path path = Paths.get("src/fta/input/" + filename);
         Files.readAllBytes(path);
       }
       return true;

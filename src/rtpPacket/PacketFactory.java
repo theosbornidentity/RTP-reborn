@@ -37,7 +37,7 @@ public class PacketFactory {
 
   public long getRTT() { return this.RTT; }
 
-  public void setRTT(long l) { this.RTT = (long) (l * 1.25); }
+  public void setRTT(double l) { this.RTT = (long) l; }
 
   public int getRecvWindow () { return this.recvWindow; }
 

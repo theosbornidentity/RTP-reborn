@@ -125,8 +125,8 @@ public class RTPServer {
         if(factories.containsKey(key)) {
           factories.get(key).setConnected(true);
           long RTT = RTPUtil.longFromByte(synfin.getData());
-          factories.get(key).setRTT(RTT);
-          float secRTT = (float) RTT/1000;
+          factories.get(key).setRTT(RTT * 1.2);
+          float secRTT = (float) (RTT*1.2)/1000;
           p.logStatus("received RTT probe of " + secRTT + " seconds");
         }
       }

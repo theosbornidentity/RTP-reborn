@@ -51,6 +51,6 @@ public class FTAServer {
     server = new RTPServer(sPort, window);
     server.setLogging(logging);
     server.setCorrupted(corrupted);
-    return server.start("src/fta/");
+    return server.start("src/fta/input/");
   }
 }
