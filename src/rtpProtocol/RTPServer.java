@@ -42,10 +42,10 @@ public class RTPServer {
   // Start Server Methods
   //============================================================================
 
-  public void start () {
+  public boolean start () {
     if(running) {
       Printer.errorLn("Server is already running.");
-      return;
+      return false;
     }
 
     running = true;
@@ -55,11 +55,13 @@ public class RTPServer {
 
     RTPUtil.stall();
 
-    acceptConnections();
-    listenForGet();
+    //acceptConnections();
+    //listenForGet();
     listenForData();
-    listenForAck();
-    listenForFin();
+    //listenForAck();
+    //listenForFin();
+
+    return true;
   }
 
   public void receivePackets () {
@@ -67,9 +69,11 @@ public class RTPServer {
       p.logStatus("receiving at " + sIP + ":" + sPort + " with window size " + window);
       for(;;) {
         RTPPacket in = mailman.receive();
-        if(in.isType(State.DATA)) buffer.put(in);
-        else if(in.isType(State.ACK)) buffer.put(in);
-        else buffer.put(in);
+        buffer.put(in);
+        if(in.isType(State.SYN)) acceptConnection();
+        else if(in.isType(State.GET)) handleGet();
+        else if(in.isType(State.ACK)) handleAck();
+        else if(in.isType(State.FIN)) handleFin();
       }
     }}).start();
   }
@@ -78,11 +82,12 @@ public class RTPServer {
   // Establish connection methods
   //============================================================================
 
-  private void acceptConnections () {
+  private void acceptConnection () {
 
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
         RTPPacket syn = newConnectionRequest();
+        if(syn == null) return;
 
         p.logStatus("received a connection request");
         createConnection(syn);
@@ -93,16 +98,14 @@ public class RTPServer {
   }
 
   private RTPPacket newConnectionRequest () {
-    for(;;) {
-      if(buffer.hasSYN()) {
-        RTPPacket syn = buffer.getSYN();
-        String key = syn.hash();
-        boolean connectionExists = (factories.get(key) != null);
-        if (!connectionExists)
-          return syn;
-      }
-      else RTPUtil.stall();
+    if(buffer.hasSYN()) {
+      RTPPacket syn = buffer.getSYN();
+      String key = syn.hash();
+      boolean connectionExists = (factories.get(key) != null);
+      if (!connectionExists)
+        return syn;
     }
+    return null;
   }
 
   private void createConnection(RTPPacket syn) {
@@ -146,10 +149,10 @@ public class RTPServer {
   // Data post methods
   //============================================================================
 
-  private void listenForGet () {
+  private void handleGet () {
 
     new Thread(new Runnable() {@Override public void run() {
-      for(;;) {
+      //for(;;) {
         RTPPacket get = newGetRequest();
 
         String key = get.hash();
@@ -168,7 +171,8 @@ public class RTPServer {
         else {
           p.logError("requested file " + filename + " does not exist");
         }
-      }
+
+      //}
     }}).start();
   }
 
@@ -194,20 +198,29 @@ public class RTPServer {
     }
   }
 
-  private void listenForAck () {
-    //p.logStatus("accepting ACKS");
-
+  private void handleAck () {
     new Thread(new Runnable() {@Override public void run() {
-      for(;;) {
-        if(buffer.hasACK()) {
-          RTPPacket ack = buffer.getACK();
-          posts.get(ack.hash()).handleAck(ack);
-        }
-        else
-          RTPUtil.stall();
+      if(buffer.hasACK()) {
+        RTPPacket ack = buffer.getACK();
+        posts.get(ack.hash()).handleAck(ack);
       }
     }}).start();
   }
+
+  // private void listenForAck () {
+  //   //p.logStatus("accepting ACKS");
+  //
+  //   new Thread(new Runnable() {@Override public void run() {
+  //     for(;;) {
+  //       if(buffer.hasACK()) {
+  //         RTPPacket ack = buffer.getACK();
+  //         posts.get(ack.hash()).handleAck(ack);
+  //       }
+  //       else
+  //         RTPUtil.stall();
+  //     }
+  //   }}).start();
+  // }
 
   //============================================================================
   // Data get methods
@@ -269,33 +282,30 @@ public class RTPServer {
   // End connection methods
   //============================================================================
 
-  private void listenForFin () {
-    for(;;) {
-      RTPUtil.stall();
-
+  private void handleFin () {
+    new Thread(new Runnable() {@Override public void run() {
       RTPPacket fin = newFIN();
+      if(fin == null) return;
       String key = fin.hash();
+
       PacketFactory factory = factories.remove(key);
       sendFINACK(fin, factory);
 
       p.logStatus("connection terminated with " + fin.hash());
-    }
+    }}).start();
   }
 
   private RTPPacket newFIN () {
-    for(;;) {
-      RTPUtil.stall();
-
-      if(buffer.hasFIN()) {
-        RTPPacket fin = buffer.getFIN();
-        String key = fin.hash();
-        boolean connectionExists = (factories.get(key) != null);
-        if (connectionExists) {
-          p.logStatus("received a request to terminate connection " + key);
-          return fin;
-        }
+    if(buffer.hasFIN()) {
+      RTPPacket fin = buffer.getFIN();
+      String key = fin.hash();
+      boolean connectionExists = (factories.get(key) != null);
+      if (connectionExists) {
+        p.logStatus("received a request to terminate connection " + key);
+        return fin;
       }
     }
+    return null;
   }
 
   private void sendFINACK (RTPPacket fin, PacketFactory factory) {
@@ -309,11 +319,13 @@ public class RTPServer {
 
       if(buffer.hasEND()) {
         RTPPacket end = buffer.getEND();
-        String key = end.hash();
-        if(factories.containsKey(key)) factories.remove(key);
-        if(gets.containsKey(key)) gets.remove(key);
-        if(posts.containsKey(key)) posts.remove(key);
-        return;
+        if(end.hash().equals(fin.hash())) {
+          String key = end.hash();
+          if(factories.containsKey(key)) factories.remove(key);
+          if(gets.containsKey(key)) gets.remove(key);
+          if(posts.containsKey(key)) posts.remove(key);
+          return;
+        }
       }
     }
   }

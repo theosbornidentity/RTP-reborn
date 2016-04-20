@@ -8,17 +8,13 @@ public class Main {
 
     Scanner scanner = new Scanner(System.in);
 
-    while(true) {
+    boolean corrupted = determineCorruption(scanner);
+    boolean logging = determineLogging(scanner);
+    boolean server = isServer(scanner);
 
-      boolean corrupted = determineCorruption(scanner);
-      boolean logging = determineLogging(scanner);
-      boolean server = isServer(scanner);
+    if(server) FTAServer.run(scanner, corrupted, logging);
+    else FTAClient.run(scanner, corrupted, logging);
 
-      if(server) FTAServer.run(scanner, corrupted, logging);
-      else FTAClient.run(scanner, corrupted, logging);
-
-      Printer.errorLn("Invalid input.");
-    }
   }
 
   public static boolean determineCorruption (Scanner scanner) {

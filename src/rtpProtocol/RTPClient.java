@@ -66,7 +66,7 @@ public class RTPClient {
       return;
     }
     sendFIN();
-    logError("firing mailman and ending connection")
+    p.logError("firing mailman and ending connection");
     mailman.fire();
     System.exit(0);
   }

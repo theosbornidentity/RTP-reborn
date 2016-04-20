@@ -30,18 +30,19 @@ public class FTAServer {
                            (args[0].equalsIgnoreCase("fta-server")) &&
                            (Integer.parseInt(args[2]) >= 1000);
 
+    boolean started = false;
     if(validCommand) {
-      start(Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+      started = start(Integer.parseInt(args[1]), Integer.parseInt(args[2]));
       return;
     }
     else {
       Printer.errorLn("Invalid command.");
     }
 
-    startServerPrompt(scanner);
+    if(!started) startServerPrompt(scanner);
   }
 
-  public static void start(int sPort, int window) {
+  public static boolean start(int sPort, int window) {
     Printer.promptLn("Starting server...\n" +
                    "\tIP: " + RTPUtil.getIPAddress() + "\n" +
                    "\tPort: " + sPort + "\n" +
@@ -50,6 +51,6 @@ public class FTAServer {
     server = new RTPServer(sPort, window);
     server.setLogging(logging);
     server.setCorrupted(corrupted);
-    server.start();
+    return server.start();
   }
 }
