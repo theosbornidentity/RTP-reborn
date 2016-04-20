@@ -8,7 +8,7 @@ import util.*;
 
 public class dbclientRTP {
 
-  private static final int WINDOW = 2000;
+  private static final int WINDOW = 5000;
   private static Printer p = new Printer(false);
 
   public static void main(String[] args) throws IOException {

@@ -99,7 +99,7 @@ public class RTPUtil {
   public static boolean filesExist (String... files) {
     try {
       for(String filename: files) {
-        Path path = Paths.get("src/fta/" + filename);
+        Path path = Paths.get("src/fta/input/" + filename);
         Files.readAllBytes(path);
       }
       return true;
@@ -111,7 +111,7 @@ public class RTPUtil {
 
   public static byte[] getFileBytes(String filename) {
     try {
-      Path path = Paths.get("src/fta/" + filename);
+      Path path = Paths.get("src/fta/input/" + filename);
       return Files.readAllBytes(path);
     } catch (IOException e) {
       Printer.errorLn("Could not find file.");

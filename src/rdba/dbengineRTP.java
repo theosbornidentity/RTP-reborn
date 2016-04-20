@@ -8,7 +8,7 @@ import util.*;
 
 public class dbengineRTP {
 
-  private static final int WINDOW = 2000;
+  private static final int WINDOW = 5000;
   private static Printer p = new Printer(false);
 
   public static void main(String[] args) throws IOException {
@@ -21,7 +21,7 @@ public class dbengineRTP {
       p.statusLn("starting server from dbengineRTP");
 
       RTPServer server = new RTPServer(serverPort, WINDOW);
-      server.start("src/fta/");
+      server.start("src/fta/input/");
 
     } catch (IllegalArgumentException e) {
         System.out.println("\nIllegal parameters\n" + e.getMessage() + "\n");
