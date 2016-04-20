@@ -124,7 +124,7 @@ public class RTPServer {
       //RTPUtil.sendPacket(socket, synack);
       p.logStatus("sent connection confirmation");
 
-      RTPUtil.stall();
+      RTPUtil.stall(200);
 
       if(buffer.hasSYNFIN()) {
         RTPPacket synfin = buffer.getSYNFIN();

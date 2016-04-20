@@ -44,10 +44,11 @@ public class RTPClient {
   // Start/End Client Methods
   //============================================================================
 
-  public void start () {
+  public boolean start () {
     receivePackets();
     this.factory = new PacketFactory(sPort, sIP, window);
     connect();
+    return connected;
   }
 
   private void receivePackets () {
@@ -80,6 +81,12 @@ public class RTPClient {
     long startTime = System.currentTimeMillis();
 
     RTPPacket synack = sendSYN();
+
+    if(synack == null) {
+      p.logError("no server running at " + this.dIP + ":" + this.dPort);
+      return false;
+    }
+
     int recvWindow = synack.getWindowSize();
     factory.setRecvWindow(recvWindow);
 
@@ -94,7 +101,10 @@ public class RTPClient {
   private RTPPacket sendSYN () {
     RTPPacket syn = factory.createSYN(dPort, dIP);
 
+    int timeout = 0;
     for(;;) {
+      if(timeout >= 10) return null;
+
       mailman.send(syn);
       p.logStatus("sent connection request");
 
@@ -107,6 +117,7 @@ public class RTPClient {
       }
 
       p.logInfo("no response to SYN... resending");
+      timeout++;
     }
   }
 

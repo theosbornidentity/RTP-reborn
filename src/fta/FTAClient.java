@@ -23,6 +23,11 @@ public class FTAClient {
 
     startClientPrompt(scanner);
 
+    Printer.promptLn("\nAccepted client commands:");
+    Printer.promptLn("\tget [filename]\n" +
+                   "\tget-post [get filname] [post filename]\n" +
+                   "\tdisconnect\n");
+                   
     startClientCommandsPrompt(scanner);
   }
 
@@ -41,10 +46,10 @@ public class FTAClient {
       validCommand = validCommand && (serverAddressAndPort.length == 2);
 
       if (validCommand) {
-        start(serverAddressAndPort[0],
-              Integer.parseInt(serverAddressAndPort[1]),
-              Integer.parseInt(args[2]));
-        return;
+        boolean started = start(serverAddressAndPort[0],
+                          Integer.parseInt(serverAddressAndPort[1]),
+                          Integer.parseInt(args[2]));
+        if(started) return;
       }
     }
 
@@ -53,10 +58,6 @@ public class FTAClient {
   }
 
   public static void startClientCommandsPrompt (Scanner scanner) {
-    Printer.promptLn("\nAccepted client commands:");
-    Printer.promptLn("\tget [filename]\n" +
-                   "\tget-post [get filname] [post filename]\n" +
-                   "\tdisconnect\n");
 
     String command = scanner.nextLine();
     String[] args = command.split(" ");
@@ -98,14 +99,14 @@ public class FTAClient {
     }
   }
 
-  public static void start (String dIP, int dPort, int window) {
+  public static boolean start (String dIP, int dPort, int window) {
     Printer.promptLn("Starting client...\n" +
                    "\tDestination " + dIP + ":" + dPort + "\n" +
                    "\tWindow Size: " + window + "\n");
     client = new RTPClient(dIP, dPort, window);
     client.setLogging(logging);
     client.setCorrupted(corrupted);
-    client.start();
+    return client.start();
   }
 
   public static void get (String getFile) {
