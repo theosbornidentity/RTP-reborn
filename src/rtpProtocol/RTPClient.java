@@ -164,10 +164,9 @@ public class RTPClient {
     getProcess = createConnectionService();
     getProcess.startGet();
 
-    if(this.connected) {
-      sendGet(filename);
-      processIncomingData(filename);
-    }
+    boolean receiving = sendGet(filename);
+    if(receiving) processIncomingData(filename);
+    else p.logError(filename + " does not exist at server");
   }
 
   public void getPost (String getFilename, String postFilename) {
@@ -185,11 +184,11 @@ public class RTPClient {
 
     postProcess = createConnectionService();
     byte[] data = RTPUtil.getFileBytes(postFilename);
-    processOutgoingData(data);
+    processOutgoingData(data, postFilename);
 
-    sendGet(getFilename);
-    processIncomingData(getFilename);
-
+    boolean receiving = sendGet(getFilename);
+    if(receiving) processIncomingData(getFilename);
+    else p.logError(getFilename + " does not exist at server");
   }
 
   //============================================================================
@@ -200,25 +199,27 @@ public class RTPClient {
     return new RTPService (mailman, factory, logging);
   }
 
-  private void sendGet (String filename) {
+  private boolean sendGet (String filename) {
     RTPPacket get = factory.createGET(filename.getBytes());
 
+    int timeout = 0;
     for(;;) {
+      if(timeout >= 10) return false;
       mailman.send(get);
       p.logSend("sent GET packet for " + filename, get.getSeqNum());
 
       stall();
 
-      if(buffer.hasDATA()) {
-        p.logStatus("incoming data");
-        return;
-      }
+      if(buffer.hasDATA()) return true;
 
       p.logInfo("no response to GET... resending");
+      timeout++;
     }
   }
 
   private void processIncomingData (String filename) {
+    p.logStatus("incoming DATA for " + filename);
+
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
         if(buffer.hasDATAFIN()) {
@@ -238,7 +239,7 @@ public class RTPClient {
     p.logStatus("GET process completed for " + filename);
     byte[] data = getProcess.getData();
     getProcess = null;
-    RTPUtil.createGETFile(filename, data);
+    RTPUtil.createGETFile(data);
     getComplete = true;
   }
 
@@ -247,8 +248,8 @@ public class RTPClient {
   // Methods for POST
   //============================================================================
 
-  private void processOutgoingData(byte[] data) {
-    postProcess.startPost(data);
+  private void processOutgoingData(byte[] data, String filename) {
+    postProcess.startPost(data, filename);
     listenForAck();
   }
 

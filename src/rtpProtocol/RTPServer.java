@@ -8,8 +8,6 @@ import util.*;
 
 public class RTPServer {
 
-  private final String FILETOVERIFY = "ship.jpg";
-
   private Printer p;
 
   private boolean corruption;
@@ -158,14 +156,19 @@ public class RTPServer {
         String key = get.hash();
 
         String filename = new String(get.getData());
-        p.logStatus("Received a new GET request for " + filename);
+        p.logStatus("received a GET request for " + filename);
 
-        RTPService postProcess = new RTPService(mailman, factories.get(key), logging);
+        if(RTPUtil.filesExist(filename)) {
+          RTPService postProcess = new RTPService(mailman, factories.get(key), logging);
 
-        posts.put(key, postProcess);
+          posts.put(key, postProcess);
 
-        byte[] data = RTPUtil.getFileBytes(filename);
-        posts.get(key).startPost(data);
+          byte[] data = RTPUtil.getFileBytes(filename);
+          posts.get(key).startPost(data, filename);
+        }
+        else {
+          p.logError("requested file " + filename + " does not exist");
+        }
       }
     }}).start();
   }
@@ -246,7 +249,7 @@ public class RTPServer {
   }
 
   private void createGetProcess (String key, RTPPacket data) {
-    p.logStatus("new incoming file transfer");
+    p.logStatus("incoming DATA from " + key);
 
     PacketFactory factory = factories.get(key);
     RTPService getProcess = new RTPService(mailman, factory, logging);
@@ -259,7 +262,7 @@ public class RTPServer {
   private void endGet(String key) {
     p.logStatus("GET process complete");
     byte[] data = gets.get(key).getData();
-    RTPUtil.createPOSTFile(FILETOVERIFY, data);
+    RTPUtil.createPOSTFile(data);
     gets.remove(key);
   }
 

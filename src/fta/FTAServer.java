@@ -47,9 +47,6 @@ public class FTAServer {
                    "\tPort: " + sPort + "\n" +
                    "\tWindow Size: " + window + "\n");
 
-    Printer.infoLn("In order for server to correctly verify incoming data transfers, \n" +
-                  "you must update FILETOVERIFY in RTPServer.java with the correct filename.\n");
-
     server = new RTPServer(sPort, window);
     server.setLogging(logging);
     server.setCorrupted(corrupted);

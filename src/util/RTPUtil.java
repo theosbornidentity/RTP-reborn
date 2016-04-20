@@ -94,6 +94,19 @@ public class RTPUtil {
     }
   }
 
+  public static boolean filesExist (String... files) {
+    try {
+      for(String filename: files) {
+        Path path = Paths.get("src/fta/" + filename);
+        Files.readAllBytes(path);
+      }
+      return true;
+    }
+    catch (IOException e) {
+      return false;
+    }
+  }
+
   public static byte[] getFileBytes(String filename) {
     try {
       Path path = Paths.get("src/fta/" + filename);
@@ -104,9 +117,8 @@ public class RTPUtil {
     }
   }
 
-  public static void createGETFile(String filename, byte[] data) {
+  public static void createGETFile(byte[] data) {
     try {
-      checkTransfer(filename, data);
       Path path = Paths.get("src/fta/get_F.jpg");
       Files.write(path, data);
     }
@@ -116,9 +128,8 @@ public class RTPUtil {
     }
   }
 
-  public static void createPOSTFile(String filename, byte[] data) {
+  public static void createPOSTFile(byte[] data) {
     try {
-      checkTransfer(filename, data);
       Path path = Paths.get("src/fta/post_G.jpg");
       Files.write(path, data);
     }

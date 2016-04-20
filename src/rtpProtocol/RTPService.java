@@ -15,6 +15,7 @@ public class RTPService {
   private PacketFactory factory;
   private int recvWindow;
 
+  private String postFilename;
   private int unackedBytes;
   private HashMap<Integer, RTPPacket> packetsToSend;
   private HashMap<Integer, RTPPacket> sentPackets;
@@ -79,17 +80,15 @@ public class RTPService {
   // Post methods
   //============================================================================
 
-  public void startPost (byte[] data) {
+  public void startPost (byte[] data, String filename) {
     if(postComplete) return;
     postComplete = false;
+    postFilename = filename;
     unackedBytes = 0;
     acked = new HashMap<Integer, Boolean>();
     sentPackets = new HashMap<Integer, RTPPacket>();
     packetsToSend = packetize(data);
-
-    new Thread(new Runnable() {@Override public void run() {
-      sendData();
-    }}).start();
+    sendData();
   }
 
   private HashMap<Integer, RTPPacket> packetize (byte[] data) {
@@ -104,13 +103,16 @@ public class RTPService {
   }
 
   private void sendData () {
-    Object[] packetList = packetsToSend.values().toArray();
-    for(Object p : packetList)
-      sendPacket((RTPPacket) p, false);
-    while(!postComplete) {
-      postComplete = resendUnacked();
-    }
-    sendDataFin();
+    new Thread(new Runnable() {@Override public void run() {
+      Object[] packetList = packetsToSend.values().toArray();
+      for(Object p : packetList)
+        sendPacket((RTPPacket) p, false);
+      while(!postComplete) {
+        postComplete = resendUnacked();
+      }
+      sendDataFin();
+      p.logStatus("POST complete for " + postFilename);
+    }}).start();
   }
 
   private void sendPacket(RTPPacket packet, boolean isResend) {
@@ -171,7 +173,6 @@ public class RTPService {
     RTPPacket datafin = factory.createDATAFIN();
     p.logSend("sending DATAFIN packet", datafin.getSeqNum());
     sendPacket(datafin, false);
-    p.logStatus("POST completed");
   }
 
   public boolean isPostComplete() {

@@ -27,7 +27,7 @@ public class FTAClient {
     Printer.promptLn("\tget [filename]\n" +
                    "\tget-post [get filname] [post filename]\n" +
                    "\tdisconnect\n");
-                   
+
     startClientCommandsPrompt(scanner);
   }
 
@@ -63,8 +63,8 @@ public class FTAClient {
     String[] args = command.split(" ");
 
     boolean validCommand = (args.length > 0) && (args.length < 4) && (
-                            (args[0].equalsIgnoreCase("get") && args.length == 2 && filesExist(args[1])) ||
-                            (args[0].equalsIgnoreCase("get-post") && args.length == 3 && filesExist(args[1], args[2])) ||
+                            (args[0].equalsIgnoreCase("get") && args.length == 2) ||
+                            (args[0].equalsIgnoreCase("get-post") && args.length == 3 && filesExist(args[2])) ||
                             (args[0].equalsIgnoreCase("disconnect") && args.length == 1));
 
     if (validCommand) {
@@ -94,7 +94,7 @@ public class FTAClient {
       return true;
     }
     catch (IOException e) {
-      Printer.errorLn("Could not find one or more files.");
+      Printer.errorLn("Can't post a file that doesn't exist.");
       return false;
     }
   }
