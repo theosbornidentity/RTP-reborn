@@ -66,8 +66,8 @@ public class RTPClient {
       return;
     }
     sendFIN();
+    logError("firing mailman and ending connection")
     mailman.fire();
-
     System.exit(0);
   }
 
@@ -129,12 +129,12 @@ public class RTPClient {
 
     for(;;) {
       mailman.send(synfin);
+      long synfinSendTime = System.currentTimeMillis();
+
       float secRTT = (float) RTT/1000;
       p.logStatus("sending server RTT probe of " + secRTT + " seconds");
 
       stall();
-
-      long synfinSendTime = System.currentTimeMillis();
 
       while(!buffer.hasSYNACK()) {
         boolean secondsPassed = (System.currentTimeMillis() - synfinSendTime > 2000);
@@ -254,8 +254,6 @@ public class RTPClient {
   }
 
   private void listenForAck () {
-    p.logStatus("accepting ACKs");
-
     new Thread(new Runnable() {@Override public void run() {
       for(;;) {
         if(postProcess.isPostComplete()) {
@@ -273,7 +271,6 @@ public class RTPClient {
   }
 
   private void endPOST () {
-    p.logStatus("POST process completed");
     postProcess = null;
     postComplete = true;
   }
@@ -286,13 +283,14 @@ public class RTPClient {
     RTPPacket fin = factory.createFIN();
 
     for(;;) {
+      p.logStatus("sending termination request");
       mailman.send(fin);
-      p.logSend("sent FIN packet");
 
       stall();
 
       if(buffer.hasFINACK()) {
-        p.logReceive("received FINACK packet");
+        p.logStatus("received confirmation of termination request");
+        sendEND();
         return;
       }
 
@@ -300,6 +298,27 @@ public class RTPClient {
     }
   }
 
+  private boolean sendEND () {
+    RTPPacket end = factory.createEND();
+
+    for(;;) {
+      p.logStatus("updating server with END status");
+      mailman.send(end);
+      long endSendTime = System.currentTimeMillis();
+
+      stall();
+
+      while(!buffer.hasFINACK()) {
+        boolean secondsPassed = (System.currentTimeMillis() - endSendTime > 2000);
+        if (secondsPassed) return true;
+        stall();
+      }
+
+      buffer.getFINACK();
+
+      p.logInfo("no response to END... resending");
+    }
+  }
 
   //============================================================================
   // Testing methods

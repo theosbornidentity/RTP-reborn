@@ -94,6 +94,10 @@ public class PacketFactory {
     return createACK(State.FINACK);
   }
 
+  public RTPPacket createEND () {
+    return createPacket(State.END);
+  }
+
   private RTPPacket createPacket (State code) {
     RTPPacket toSend = new RTPPacket(window, code.ordinal(), seqNum, ackNum, sPort, dPort, sIP, dIP);
     this.seqNum += toSend.getPacketHeader().getPacketSize();

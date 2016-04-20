@@ -98,7 +98,7 @@ public class RTPService {
     for(RTPPacket p : dataPackets)
       toReturn.put(p.getSeqNum(), p);
 
-    p.logStatus("packets to send: " + toReturn.size());
+    p.logStatus("sending " + postFilename + " as " + toReturn.size() + " packets");
     return toReturn;
   }
 

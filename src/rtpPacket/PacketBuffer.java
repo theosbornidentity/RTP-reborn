@@ -21,6 +21,7 @@ public class PacketBuffer {
     this.queues.add(State.ACK.ordinal(), new ArrayList<RTPPacket>());
     this.queues.add(State.FIN.ordinal(), new ArrayList<RTPPacket>());
     this.queues.add(State.FINACK.ordinal(), new ArrayList<RTPPacket>());
+    this.queues.add(State.END.ordinal(), new ArrayList<RTPPacket>());
   }
 
   //============================================================================
@@ -37,6 +38,7 @@ public class PacketBuffer {
     else if (in.isType(State.ACK))     safePut(State.ACK, in);
     else if (in.isType(State.FIN))     safePut(State.FIN, in);
     else if (in.isType(State.FINACK))  safePut(State.FINACK, in);
+    else if (in.isType(State.END))  safePut(State.END, in);
   }
 
   private void safePut(State state, RTPPacket in) {
@@ -87,6 +89,10 @@ public class PacketBuffer {
     return !queues.get(State.FINACK.ordinal()).isEmpty();
   }
 
+  public boolean hasEND() {
+    return !queues.get(State.END.ordinal()).isEmpty();
+  }
+
   //============================================================================
   // GET METHODS
   //============================================================================
@@ -125,6 +131,10 @@ public class PacketBuffer {
 
   public RTPPacket getFINACK() {
     return safeGet(State.FINACK);
+  }
+
+  public RTPPacket getEND() {
+    return safeGet(State.END);
   }
 
   private RTPPacket safeGet(State state) {

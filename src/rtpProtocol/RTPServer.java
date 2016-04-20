@@ -117,7 +117,6 @@ public class RTPServer {
 
     for(;;) {
       mailman.send(synack);
-      //RTPUtil.sendPacket(socket, synack);
       p.logStatus("sent connection confirmation");
 
       RTPUtil.stall(200);
@@ -271,18 +270,16 @@ public class RTPServer {
   //============================================================================
 
   private void listenForFin () {
-    //  p.logStatus("accepting FIN requests");
+    for(;;) {
+      RTPUtil.stall();
 
-      for(;;) {
-        RTPUtil.stall();
+      RTPPacket fin = newFIN();
+      String key = fin.hash();
+      PacketFactory factory = factories.remove(key);
+      sendFINACK(fin, factory);
 
-        RTPPacket fin = newFIN();
-        String key = fin.hash();
-        PacketFactory factory = factories.remove(key);
-        sendFINACK(fin, factory);
-
-        p.logStatus("connection terminated with " + fin.hash());
-      }
+      p.logStatus("connection terminated with " + fin.hash());
+    }
   }
 
   private RTPPacket newFIN () {
@@ -294,7 +291,7 @@ public class RTPServer {
         String key = fin.hash();
         boolean connectionExists = (factories.get(key) != null);
         if (connectionExists) {
-          p.logReceive("received a FIN packet for connection " + key);
+          p.logStatus("received a request to terminate connection " + key);
           return fin;
         }
       }
@@ -304,9 +301,20 @@ public class RTPServer {
   private void sendFINACK (RTPPacket fin, PacketFactory factory) {
     RTPPacket finack = factory.createFINACK(fin);
 
-    for(int i = 0; i < 3; i++) {
+    for(;;) {
       mailman.send(finack);
-      p.logSend("sent FINACK packet");
+      p.logStatus("confirming connection termination");
+
+      RTPUtil.stall(200);
+
+      if(buffer.hasEND()) {
+        RTPPacket end = buffer.getEND();
+        String key = end.hash();
+        if(factories.containsKey(key)) factories.remove(key);
+        if(gets.containsKey(key)) gets.remove(key);
+        if(posts.containsKey(key)) posts.remove(key);
+        return;
+      }
     }
   }
 
