@@ -124,7 +124,8 @@ public class RTPClient {
     long RTT = System.currentTimeMillis() - startTime;
 
     RTPPacket synfin = factory.createSYNFIN(RTT);
-    factory.setRTT(RTT * 1.2);
+    RTT = (long) (RTT * 1.2);
+    factory.setRTT(RTT);
 
     for(;;) {
       mailman.send(synfin);
@@ -308,7 +309,7 @@ public class RTPClient {
       p.logStatus("sending termination request");
       mailman.send(fin);
 
-      stall();
+      RTPUtil.stall(200);
 
       if(buffer.hasFINACK()) {
         p.logStatus("received confirmation of termination request");
@@ -328,7 +329,7 @@ public class RTPClient {
       mailman.send(end);
       long endSendTime = System.currentTimeMillis();
 
-      stall();
+      RTPUtil.stall(200);
 
       while(!buffer.hasFINACK()) {
         boolean secondsPassed = (System.currentTimeMillis() - endSendTime > 2000);
@@ -336,7 +337,7 @@ public class RTPClient {
           postComplete = true;
           return true;
         }
-        stall();
+        RTPUtil.stall(200);
       }
 
       buffer.getFINACK();

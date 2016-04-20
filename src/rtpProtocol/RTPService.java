@@ -20,6 +20,8 @@ public class RTPService {
   private HashMap<Integer, RTPPacket> packetsToSend;
   private HashMap<Integer, RTPPacket> sentPackets;
   private HashMap<Integer, Boolean> acked;
+  private HashMap<Integer, Long> timeSent;
+
   private boolean postComplete;
 
   private int recvDataBytes;
@@ -86,6 +88,7 @@ public class RTPService {
     postFilename = filename;
     unackedBytes = 0;
     acked = new HashMap<Integer, Boolean>();
+    timeSent = new HashMap<Integer, Long>();
     sentPackets = new HashMap<Integer, RTPPacket>();
     packetsToSend = packetize(data);
     sendData();
@@ -105,19 +108,20 @@ public class RTPService {
   private void sendData () {
     new Thread(new Runnable() {@Override public void run() {
       Object[] packetList = packetsToSend.values().toArray();
+      p.logStatus("starting estimated RTT " + factory.getRTT());
       for(Object p : packetList)
         sendPacket((RTPPacket) p, false);
       while(!postComplete) {
         postComplete = resendUnacked();
       }
+      p.logStatus("end estimated RTT " + factory.getRTT());
       sendDataFin();
       p.logStatus("POST complete for " + postFilename);
     }}).start();
   }
 
   private void sendPacket(RTPPacket packet, boolean isResend) {
-    int windowFull = 0;
-    int availableWindow = 0;
+  //  int windowFull = 0, windowOpen = 0;
     for(;;) {
       int bytesOut;
       if(!isResend) bytesOut = unackedBytes + packet.getSize();
@@ -125,18 +129,14 @@ public class RTPService {
       boolean recvWindowFull = (bytesOut > recvWindow);
 
       if(!recvWindowFull) {
-        windowFull = 0;
-        availableWindow++;
+    //    decreaseRTT();
+    //    windowFull = 0; windowOpen++;
         mailman.send(packet);
+        timeSent.put(packet.getSeqNum(), System.currentTimeMillis());
 
         if(!isResend) {
           sentPackets.put(packet.getSeqNum(), packet);
           unackedBytes += packet.getSize();
-        }
-
-        if(availableWindow >= 2) {
-          availableWindow = 0;
-          decreaseRTT();
         }
 
         p.logSend("sent packet " + packet.getSeqNum(), unackedBytes);
@@ -144,12 +144,12 @@ public class RTPService {
       }
 
       else {
-        windowFull++;
-
-        if(windowFull >= 2) {
-          windowFull = 0;
-          increaseRTT();
-        }
+        // windowFull++;
+        //
+        // if(windowFull >= 2) {
+        //   windowFull = 0;
+        //   increaseRTT();
+        // }
 
         p.logInfo("receiver window full");
         if(!isResend) resendUnacked();
@@ -157,17 +157,22 @@ public class RTPService {
     }
   }
 
-  private void increaseRTT() {
-    factory.setRTT(factory.getRTT() * 1.2);
-    float secRTT = (float) factory.getRTT()/1000;
-    p.logStatus("adjusted connection RTT delay to " + secRTT);
-  }
-
-  private void decreaseRTT() {
-    factory.setRTT(factory.getRTT() * .8);
-    float secRTT = (float) factory.getRTT()/1000;
-    p.logStatus("adjusted connection RTT delay to " + secRTT);
-  }
+  // private void increaseRTT() {
+  //   //p.logStatus("RTT was " + factory.getRTT());
+  //   long newRTT = (long) (factory.getRTT() * 2;
+  //   //p.logStatus("new RTT " + newRTT);
+  //
+  //   factory.setRTT(newRTT);
+  //   float secRTT = (float) factory.getRTT()/1000;
+  //   p.logStatus("adjusted connection RTT delay to " + secRTT);
+  // }
+  //
+  // private void decreaseRTT() {
+  //   long newRTT = (long) (factory.getRTT() * .99);
+  //   factory.setRTT(newRTT);
+  //   float secRTT = (float) factory.getRTT()/1000;
+  //   p.logError("adjusted connection RTT delay to " + secRTT);
+  // }
 
   private boolean resendUnacked() {
     stall();
@@ -195,6 +200,13 @@ public class RTPService {
     if(!isDuplicate) {
       p.logReceive("ACK received " + seqNum);
       acked.put(seqNum, true);
+
+      Long timeOut = timeSent.get(seqNum);
+      if(timeOut != null) {
+        long delay = System.currentTimeMillis() - timeOut;
+        updateRTT(delay);
+      }
+
       if(ackedPacket != null)
         unackedBytes -= ackedPacket.getSize();
     }
@@ -207,7 +219,7 @@ public class RTPService {
       p.logSend("sending DATAFIN packet", datafin.getSeqNum());
       mailman.send(datafin);
 
-      stall();
+      RTPUtil.stall();
 
       if(acked.get(datafin.getSeqNum()) != null) {
         p.logStatus("received DATAFIN confirmation");
@@ -218,6 +230,13 @@ public class RTPService {
       p.logInfo("no response to DATAFIN... resending");
     }
 
+  }
+
+  private void updateRTT(long newDelay) {
+    long oldDelay = factory.getRTT();
+    long newRTT = (long) ((.8*oldDelay) + (.2*newDelay));
+    factory.setRTT(newRTT);
+    p.logInfo("estimated RTT " + newRTT);
   }
 
   public boolean isPostComplete() {

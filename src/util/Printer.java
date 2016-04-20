@@ -46,15 +46,15 @@ public class Printer {
   }
 
   public void logStatus (String s) {
-    statusLn("----\t" + s + "\t----");
+    statusLn("----" + s);
   }
 
   public void logCorruption (String s) {
-    if(logging) errorLn("----\t" + s + "\t----");
+    if(logging) errorLn("----" + s);
   }
 
   public void logError (String s) {
-    errorLn("----\t" + s + "\t----");
+    errorLn("----" + s);
   }
 
   public static void success(Object m) {

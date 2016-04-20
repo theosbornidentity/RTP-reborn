@@ -140,7 +140,9 @@ public class PacketBuffer {
   private RTPPacket safeGet(State state) {
     while(queueIsBusy) { RTPUtil.delay(); }
     queueIsBusy = true;
-      RTPPacket toReturn = queues.get(state.ordinal()).remove(0);
+      RTPPacket toReturn = null;
+      if(!queues.get(state.ordinal()).isEmpty())
+        toReturn = queues.get(state.ordinal()).remove(0);
     queueIsBusy = false;
     return toReturn;
   }

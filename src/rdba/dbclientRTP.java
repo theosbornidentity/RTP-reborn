@@ -40,6 +40,8 @@ public class dbclientRTP {
 
       RTPUtil.createGETFile(data);
 
+      RTPUtil.stall(5000);
+      
       rtp.disconnect();
       p.logStatus("disconnected from server, process complete");
 
